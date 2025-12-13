@@ -1,4 +1,4 @@
-package com.example.carrygo
+package com.carrygo.app
 
 import io.flutter.embedding.android.FlutterActivity
 
