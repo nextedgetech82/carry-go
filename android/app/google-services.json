@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1054532127126",
+    "project_id": "carrygo-55444",
+    "storage_bucket": "carrygo-55444.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1054532127126:android:0121ba4da5d0c35fe4f5b7",
+        "android_client_info": {
+          "package_name": "com.carrygo.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCyhQBN5tTxQm9GSuqRwlSsxnW5k-5POx4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
