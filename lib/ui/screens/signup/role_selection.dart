@@ -1,9 +1,10 @@
-import 'package:carrygo/ui/screens/signup/email_verification_screen.dart';
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class RoleSelectionScreen extends StatefulWidget {
+import '../../../core/auth/role_selection_controller.dart';
+import '../../screens/signup/email_verification_screen.dart';
+
+class RoleSelectionScreen extends ConsumerWidget {
   final String firstName;
   final String lastName;
   final String email;
@@ -20,69 +21,26 @@ class RoleSelectionScreen extends StatefulWidget {
   });
 
   @override
-  State<RoleSelectionScreen> createState() => _RoleSelectionScreenState();
-}
-
-class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
-  String? selectedRole;
-  bool loading = false;
-
-  Future<void> _signup() async {
-    if (selectedRole == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Please select a role')));
-      return;
-    }
-
-    setState(() => loading = true);
-
-    try {
-      final cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: widget.email,
-        password: widget.password,
-      );
-
-      final user = cred.user;
-
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(cred.user!.uid)
-          .set({
-            'firstName': widget.firstName,
-            'lastName': widget.lastName,
-            'email': widget.email,
-            'phone': widget.phone,
-            'role': selectedRole,
-            'emailVerified': false,
-            'createdAt': FieldValue.serverTimestamp(),
-          });
-      // 🔹 SEND EMAIL VERIFICATION
-      if (user != null && !user.emailVerified) {
-        await user.reload(); // 🔥 IMPORTANT
-        await user.sendEmailVerification();
-      }
-      //await user?.sendEmailVerification();
-
-      // 🔹 NAVIGATE TO VERIFICATION SCREEN
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const EmailVerificationScreen()),
-      );
-
-      // TODO: Navigate to Email Verification / Dashboard
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.toString())));
-    } finally {
-      setState(() => loading = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final state = ref.watch(roleSelectionControllerProvider);
+
+    ref.listen(roleSelectionControllerProvider, (prev, next) {
+      if (prev?.loading == true &&
+          next.loading == false &&
+          next.error == null) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const EmailVerificationScreen()),
+        );
+      }
+
+      if (next.error != null) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(next.error!)));
+      }
+    });
 
     return Scaffold(
       appBar: AppBar(title: const Text('Choose Your Role')),
@@ -93,14 +51,14 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'How will you use CarryGo?',
+                'How will you use Travel Fetcher?',
                 style: theme.textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
-                'You can always change this later from settings.',
+                'You can change this later from settings.',
                 style: theme.textTheme.bodyMedium,
               ),
 
@@ -110,8 +68,10 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                 title: 'Traveller',
                 subtitle: 'Earn money by carrying items while you travel.',
                 icon: Icons.flight_takeoff,
-                selected: selectedRole == 'traveller',
-                onTap: () => setState(() => selectedRole = 'traveller'),
+                selected: state.selectedRole == 'traveller',
+                onTap: () => ref
+                    .read(roleSelectionControllerProvider.notifier)
+                    .selectRole('traveller'),
               ),
 
               const SizedBox(height: 16),
@@ -120,8 +80,10 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                 title: 'Sender',
                 subtitle: 'Send items securely with verified travellers.',
                 icon: Icons.local_shipping,
-                selected: selectedRole == 'sender',
-                onTap: () => setState(() => selectedRole = 'sender'),
+                selected: state.selectedRole == 'sender',
+                onTap: () => ref
+                    .read(roleSelectionControllerProvider.notifier)
+                    .selectRole('sender'),
               ),
 
               const Spacer(),
@@ -130,8 +92,20 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                 width: double.infinity,
                 height: 54,
                 child: ElevatedButton(
-                  onPressed: loading ? null : _signup,
-                  child: loading
+                  onPressed: state.loading
+                      ? null
+                      : () {
+                          ref
+                              .read(roleSelectionControllerProvider.notifier)
+                              .submitSignup(
+                                firstName: firstName,
+                                lastName: lastName,
+                                email: email,
+                                phone: phone,
+                                password: password,
+                              );
+                        },
+                  child: state.loading
                       ? const CircularProgressIndicator(color: Colors.white)
                       : const Text('Create Account'),
                 ),

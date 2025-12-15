@@ -1,69 +1,23 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'dart:async';
 
-class EmailVerificationScreen extends StatefulWidget {
+import '../../../core/auth/email_verification_controller.dart';
+
+class EmailVerificationScreen extends ConsumerWidget {
   const EmailVerificationScreen({super.key});
 
   @override
-  State<EmailVerificationScreen> createState() =>
-      _EmailVerificationScreenState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(emailVerificationControllerProvider);
+    final email = FirebaseAuth.instance.currentUser?.email ?? '';
 
-class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
-  Timer? _timer;
-  bool isVerified = false;
-  bool isSending = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _startVerificationCheck();
-  }
-
-  void _startVerificationCheck() {
-    _timer = Timer.periodic(const Duration(seconds: 5), (_) async {
-      await FirebaseAuth.instance.currentUser?.reload();
-      final user = FirebaseAuth.instance.currentUser;
-
-      if (user != null && user.emailVerified) {
-        _timer?.cancel();
-        setState(() => isVerified = true);
-
-        // 🔹 UPDATE FIRESTORE FLAG
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .update({'emailVerified': true});
-
-        if (!mounted) return;
-
-        // TODO: Navigate to Dashboard / Splash
+    // 🔁 Listen for verification success
+    ref.listen(emailVerificationControllerProvider, (prev, next) {
+      if (next.verified) {
+        Navigator.pushReplacementNamed(context, '/');
       }
     });
-  }
-
-  Future<void> _resendEmail() async {
-    setState(() => isSending = true);
-    await FirebaseAuth.instance.currentUser?.sendEmailVerification();
-    setState(() => isSending = false);
-
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Verification email sent')));
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final email = FirebaseAuth.instance.currentUser?.email ?? '';
 
     return Scaffold(
       body: SafeArea(
@@ -75,50 +29,48 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
               Icon(
                 Icons.mark_email_unread,
                 size: 72,
-                color: theme.colorScheme.primary,
+                color: Theme.of(context).colorScheme.primary,
               ),
               const SizedBox(height: 24),
 
-              Text(
+              const Text(
                 'Verify your email',
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
               ),
 
               const SizedBox(height: 12),
 
-              Text(
-                'We’ve sent a verification link to:',
-                style: theme.textTheme.bodyMedium,
+              Text(email, style: const TextStyle(fontWeight: FontWeight.w600)),
+
+              const SizedBox(height: 16),
+
+              const Text(
+                'Check your inbox and click the verification link.',
                 textAlign: TextAlign.center,
-              ),
-
-              const SizedBox(height: 6),
-
-              Text(
-                email,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              Text(
-                'Please check your inbox and click the link to continue.',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodySmall,
               ),
 
               const SizedBox(height: 32),
 
               SizedBox(
                 width: double.infinity,
-                height: 54,
+                height: 52,
                 child: ElevatedButton(
-                  onPressed: isSending ? null : _resendEmail,
-                  child: isSending
+                  onPressed: state.sending
+                      ? null
+                      : () async {
+                          await ref
+                              .read(
+                                emailVerificationControllerProvider.notifier,
+                              )
+                              .resendEmail();
+
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Verification email sent'),
+                            ),
+                          );
+                        },
+                  child: state.sending
                       ? const CircularProgressIndicator(color: Colors.white)
                       : const Text('Resend Email'),
                 ),

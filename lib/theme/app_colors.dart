@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 class AppColors {
   // Brand
-  static const primary = Color(0xFF1E88E5); // CarryGo Blue
+  static const primary = Color(0xFF1E88E5); // Travel Fetcher Blue
   static const accent = Color(0xFF2ECC71); // Earnings Green
 
   // Light

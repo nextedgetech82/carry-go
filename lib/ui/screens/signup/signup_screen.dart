@@ -1,25 +1,35 @@
-import 'package:carrygo/ui/screens/signup/role_selection.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:carrygo/ui/screens/signup/role_selection.dart';
+import 'signup_controller.dart';
 
-class SignupScreen extends StatefulWidget {
+class SignupScreen extends ConsumerStatefulWidget {
   const SignupScreen({super.key});
 
   @override
-  State<SignupScreen> createState() => _SignupScreenState();
+  ConsumerState<SignupScreen> createState() => _SignupScreenState();
 }
 
-class _SignupScreenState extends State<SignupScreen> {
+class _SignupScreenState extends ConsumerState<SignupScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  final firstNameCtrl = TextEditingController();
-  final lastNameCtrl = TextEditingController();
-  final emailCtrl = TextEditingController();
-  final phoneCtrl = TextEditingController();
-  final passwordCtrl = TextEditingController();
-  final confirmPasswordCtrl = TextEditingController();
+  late final TextEditingController firstNameCtrl;
+  late final TextEditingController lastNameCtrl;
+  late final TextEditingController emailCtrl;
+  late final TextEditingController phoneCtrl;
+  late final TextEditingController passwordCtrl;
+  late final TextEditingController confirmPasswordCtrl;
 
-  bool agreed = false;
-  bool showPassword = false;
+  @override
+  void initState() {
+    super.initState();
+    firstNameCtrl = TextEditingController();
+    lastNameCtrl = TextEditingController();
+    emailCtrl = TextEditingController();
+    phoneCtrl = TextEditingController();
+    passwordCtrl = TextEditingController();
+    confirmPasswordCtrl = TextEditingController();
+  }
 
   @override
   void dispose() {
@@ -33,12 +43,9 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   void _continue() {
-    if (!_formKey.currentState!.validate() || !agreed) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please complete all fields')),
-      );
-      return;
-    }
+    final signupController = ref.read(signupProvider.notifier);
+
+    if (!signupController.validateForm(_formKey, context)) return;
 
     Navigator.push(
       context,
@@ -57,15 +64,17 @@ class _SignupScreenState extends State<SignupScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final state = ref.watch(signupProvider);
+    final controller = ref.read(signupProvider.notifier);
 
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+          padding: const EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 🔹 Brand Header
+              /// 🔹 Header
               Center(
                 child: Column(
                   children: [
@@ -90,7 +99,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Join CarryGo and start earning',
+                      'Join Travel Fetcher and start earning',
                       style: theme.textTheme.bodyMedium,
                     ),
                   ],
@@ -99,7 +108,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
               const SizedBox(height: 32),
 
-              // 🔹 Form Card
+              /// 🔹 Form Card
               Card(
                 elevation: 2,
                 shape: RoundedRectangleBorder(
@@ -121,7 +130,7 @@ class _SignupScreenState extends State<SignupScreen> {
                                   prefixIcon: Icon(Icons.person),
                                 ),
                                 validator: (v) =>
-                                    v!.isEmpty ? 'Required' : null,
+                                    v == null || v.isEmpty ? 'Required' : null,
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -132,7 +141,7 @@ class _SignupScreenState extends State<SignupScreen> {
                                   labelText: 'Last Name',
                                 ),
                                 validator: (v) =>
-                                    v!.isEmpty ? 'Required' : null,
+                                    v == null || v.isEmpty ? 'Required' : null,
                               ),
                             ),
                           ],
@@ -147,8 +156,9 @@ class _SignupScreenState extends State<SignupScreen> {
                             prefixIcon: Icon(Icons.email),
                           ),
                           keyboardType: TextInputType.emailAddress,
-                          validator: (v) =>
-                              !v!.contains('@') ? 'Invalid email' : null,
+                          validator: (v) => v != null && v.contains('@')
+                              ? null
+                              : 'Invalid email',
                         ),
 
                         const SizedBox(height: 16),
@@ -159,29 +169,28 @@ class _SignupScreenState extends State<SignupScreen> {
                             labelText: 'Phone (optional)',
                             prefixIcon: Icon(Icons.phone),
                           ),
-                          keyboardType: TextInputType.phone,
                         ),
 
                         const SizedBox(height: 16),
 
                         TextFormField(
                           controller: passwordCtrl,
-                          obscureText: !showPassword,
+                          obscureText: !state.showPassword,
                           decoration: InputDecoration(
                             labelText: 'Password',
                             prefixIcon: const Icon(Icons.lock),
                             suffixIcon: IconButton(
                               icon: Icon(
-                                showPassword
+                                state.showPassword
                                     ? Icons.visibility_off
                                     : Icons.visibility,
                               ),
-                              onPressed: () =>
-                                  setState(() => showPassword = !showPassword),
+                              onPressed: controller.togglePassword,
                             ),
                           ),
-                          validator: (v) =>
-                              v!.length < 6 ? 'Min 6 characters' : null,
+                          validator: (v) => v != null && v.length >= 6
+                              ? null
+                              : 'Min 6 characters',
                         ),
 
                         const SizedBox(height: 16),
@@ -193,22 +202,19 @@ class _SignupScreenState extends State<SignupScreen> {
                             labelText: 'Confirm Password',
                             prefixIcon: Icon(Icons.lock),
                           ),
-                          validator: (v) => v != passwordCtrl.text
-                              ? 'Passwords do not match'
-                              : null,
+                          validator: (v) => v == passwordCtrl.text
+                              ? null
+                              : 'Passwords do not match',
                         ),
 
                         const SizedBox(height: 16),
 
                         Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Checkbox(
-                              value: agreed,
-                              onChanged: (v) => setState(() => agreed = v!),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(4),
-                              ),
+                              value: state.agreed,
+                              onChanged: (v) =>
+                                  controller.setAgreed(v ?? false),
                             ),
                             const SizedBox(width: 8),
                             const Expanded(
@@ -221,7 +227,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
                         const SizedBox(height: 20),
 
-                        // 🔹 Premium CTA
+                        /// 🔹 CTA
                         SizedBox(
                           width: double.infinity,
                           height: 54,
@@ -248,8 +254,6 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                 ),
               ),
-
-              const SizedBox(height: 24),
             ],
           ),
         ),
