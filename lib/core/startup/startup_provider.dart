@@ -36,7 +36,8 @@ final startupProvider = FutureProvider<StartupResult>((ref) async {
       .get();
 
   // 5️⃣ Phone verification ✅ NEW
-  //final data = doc.data()!;
+  // Dhruv Phone Verification
+  // final data = doc.data()!;
   // final phoneVerified = data['phoneVerified'] == true;
   // if (!phoneVerified) {
   //   return StartupResult.phoneVerification;

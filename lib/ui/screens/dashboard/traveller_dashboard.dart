@@ -1,6 +1,7 @@
 import 'package:carrygo/core/startup/startup_provider.dart';
 import 'package:carrygo/providers/my_trips_provider.dart';
 import 'package:carrygo/providers/user_profile_provider.dart';
+import 'package:carrygo/ui/screens/sender/incoming_requests_provider.dart';
 import 'package:carrygo/ui/screens/trip/add_trip_screen.dart';
 import 'package:carrygo/ui/screens/trip/trip_details_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -57,7 +58,7 @@ class TravellerDashboard extends ConsumerWidget {
   }
 }
 
-class _DashboardBody extends StatelessWidget {
+class _DashboardBody extends ConsumerWidget {
   final ThemeData theme;
   final String fullName;
   final AsyncValue tripsAsync;
@@ -68,8 +69,46 @@ class _DashboardBody extends StatelessWidget {
     required this.tripsAsync,
   });
 
+  Future<void> acceptRequest(
+    BuildContext context,
+    Map<String, dynamic> r,
+  ) async {
+    final db = FirebaseFirestore.instance;
+
+    await db.runTransaction((tx) async {
+      final tripRef = db.collection('trips').doc(r['tripId']);
+      final reqRef = db.collection('requests').doc(r['id']);
+
+      final tripSnap = await tx.get(tripRef);
+      final available = tripSnap['availableWeightKg'];
+
+      if (available < r['requestedWeightKg']) {
+        throw Exception('Not enough available weight');
+      }
+
+      tx.update(tripRef, {
+        'availableWeightKg': available - r['requestedWeightKg'],
+      });
+
+      tx.update(reqRef, {
+        'status': 'accepted',
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    });
+  }
+
+  Future<void> rejectRequest(
+    BuildContext context,
+    Map<String, dynamic> r,
+  ) async {
+    await FirebaseFirestore.instance.collection('requests').doc(r['id']).update(
+      {'status': 'rejected', 'updatedAt': FieldValue.serverTimestamp()},
+    );
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final requestsAsync = ref.watch(incomingRequestsProvider);
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -117,6 +156,70 @@ class _DashboardBody extends StatelessWidget {
                 ),
               ),
             ),
+          ),
+
+          const SizedBox(height: 32),
+
+          /// 🔹 Incoming Requests
+          Text(
+            'Incoming Requests',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          requestsAsync.when(
+            loading: () => const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: CircularProgressIndicator(),
+            ),
+            error: (e, _) => Text(
+              'Failed to load requests',
+              style: TextStyle(color: Colors.red),
+            ),
+            data: (requests) {
+              if (requests.isEmpty) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 20),
+                  child: Text(
+                    'No incoming requests',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                );
+              }
+
+              return Column(
+                children: requests.map<Widget>((r) {
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: ListTile(
+                      title: Text('${r['fromCity']} → ${r['toCity']}'),
+                      subtitle: Text(
+                        '${r['requestedWeightKg']} kg • ₹${r['totalPrice']}',
+                      ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.check, color: Colors.green),
+                            onPressed: () => acceptRequest(context, r),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close, color: Colors.red),
+                            onPressed: () => rejectRequest(context, r),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+              );
+            },
           ),
 
           const SizedBox(height: 32),
