@@ -162,8 +162,7 @@ class _DashboardBody extends StatelessWidget {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) =>
-                                TripDetailsScreen(tripId: tripId, trip: trip),
+                            builder: (_) => TripDetailsScreen(tripId: tripId),
                           ),
                         );
                       },

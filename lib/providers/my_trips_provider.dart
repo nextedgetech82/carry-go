@@ -12,6 +12,7 @@ final myTripsProvider = StreamProvider<List<Map<String, dynamic>>>((ref) {
   return FirebaseFirestore.instance
       .collection('trips')
       .where('travellerId', isEqualTo: user.uid)
+      .where('status', whereIn: ['active', 'completed', 'cancelled'])
       //.orderBy('departureDate', descending: true)
       .snapshots()
       .map((snapshot) {
