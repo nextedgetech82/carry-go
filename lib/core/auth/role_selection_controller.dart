@@ -47,6 +47,7 @@ class RoleSelectionController extends StateNotifier<RoleSelectionState> {
         'phone': phone,
         'role': state.selectedRole,
         'emailVerified': false,
+        'phoneVerified': false,
         'createdAt': FieldValue.serverTimestamp(),
       });
 

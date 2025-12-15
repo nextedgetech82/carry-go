@@ -1,4 +1,6 @@
+import 'package:carrygo/core/auth/phone_otp_screen.dart';
 import 'package:carrygo/ui/screens/signin/signin_screen.dart';
+import 'package:carrygo/ui/screens/signup/phone_otp_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -50,7 +52,9 @@ class SplashScreen extends ConsumerWidget {
       case StartupResult.emailVerification:
         page = const EmailVerificationScreen();
         break;
-
+      case StartupResult.phoneVerification:
+        page = const PhoneOtpScreen();
+        break;
       case StartupResult.travellerDashboard:
         page = const TravellerDashboard();
         break;
