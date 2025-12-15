@@ -1,3 +1,4 @@
+import 'package:carrygo/ui/screens/trip/timeline/trip_timeline_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/legacy.dart';
@@ -24,7 +25,7 @@ class AddTripController extends StateNotifier<AddTripState> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    await FirebaseFirestore.instance.collection('trips').add({
+    final docRef = await FirebaseFirestore.instance.collection('trips').add({
       'travellerId': user.uid,
       'fromCity': fromCity,
       'toCity': toCity,
@@ -37,6 +38,16 @@ class AddTripController extends StateNotifier<AddTripState> {
       'createdAt': FieldValue.serverTimestamp(),
     });
 
+    final tripId = docRef.id;
+
+    /// 2️⃣ Timeline log
+    await TripTimelineService.log(
+      tripId: tripId,
+      action: 'created',
+      title: 'Trip Created',
+      description: 'Trip created from $fromCity to $toCity',
+      travellerId: user.uid,
+    );
     state = state.copyWith(loading: false);
   }
 }

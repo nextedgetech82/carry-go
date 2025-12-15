@@ -1,5 +1,8 @@
 import 'package:carrygo/providers/trip_details_provider.dart';
+import 'package:carrygo/providers/trip_timeline_provider.dart';
 import 'package:carrygo/ui/screens/trip/edit_trip_screen.dart';
+import 'package:carrygo/ui/screens/trip/timeline/timeline.dart';
+import 'package:carrygo/ui/screens/trip/timeline/trip_timeline_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -97,30 +100,71 @@ class TripDetailsScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 12),
 
-                  _OutlineButton(
-                    label: 'Mark Completed',
-                    icon: Icons.check_circle,
-                    onPressed: () async {
-                      await actions.updateStatus(
-                        tripId: tripId,
-                        status: 'completed',
-                        context: context,
-                      );
-                    },
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _OutlineButton(
+                          label: 'Complete',
+                          icon: Icons.check_circle,
+                          onPressed: () async {
+                            await actions.updateStatus(
+                              tripId: tripId,
+                              trip: trip,
+                              status: 'completed',
+                              context: context,
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          icon: const Icon(Icons.cancel, color: Colors.orange),
+                          label: const Text('Cancel'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.orange,
+                            side: const BorderSide(color: Colors.orange),
+                            minimumSize: const Size.fromHeight(52),
+                          ),
+                          onPressed: () async {
+                            await actions.updateStatus(
+                              tripId: tripId,
+                              trip: trip,
+                              status: 'cancelled',
+                              context: context,
+                            );
+                          },
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 12),
 
-                  _DangerButton(
-                    label: 'Cancel Trip',
-                    icon: Icons.cancel,
-                    onPressed: () async {
-                      await actions.updateStatus(
-                        tripId: tripId,
-                        status: 'cancelled',
-                        context: context,
-                      );
-                    },
-                  ),
+                  // _OutlineButton(
+                  //   label: 'Mark Completed',
+                  //   icon: Icons.check_circle,
+                  //   onPressed: () async {
+                  //     await actions.updateStatus(
+                  //       tripId: tripId,
+                  //       trip: trip,
+                  //       status: 'completed',
+                  //       context: context,
+                  //     );
+                  //   },
+                  // ),
+                  // const SizedBox(height: 12),
+
+                  // _DangerButton(
+                  //   label: 'Cancel Trip',
+                  //   icon: Icons.cancel,
+                  //   onPressed: () async {
+                  //     await actions.updateStatus(
+                  //       tripId: tripId,
+                  //       trip: trip,
+                  //       status: 'cancelled',
+                  //       context: context,
+                  //     );
+                  //   },
+                  // ),
                   const SizedBox(height: 12),
 
                   _DangerButton(
@@ -153,6 +197,7 @@ class TripDetailsScreen extends ConsumerWidget {
                       if (confirm == true) {
                         await actions.deleteTrip(
                           tripId: tripId,
+                          trip: trip,
                           context: context,
                         );
 
@@ -163,6 +208,20 @@ class TripDetailsScreen extends ConsumerWidget {
                     },
                   ),
                 ],
+
+                const SizedBox(height: 32),
+                _PrimaryButton(
+                  label: 'View History',
+                  icon: Icons.history,
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => TripTimelineScreen(tripId: tripId),
+                      ),
+                    );
+                  },
+                ),
               ],
             ),
           );

@@ -1,3 +1,4 @@
+import 'package:carrygo/ui/screens/trip/timeline/trip_timeline_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -92,6 +93,14 @@ class _EditTripScreenState extends ConsumerState<EditTripScreen> {
           'updatedAt': FieldValue.serverTimestamp(),
         });
 
+    await TripTimelineService.log(
+      tripId: widget.tripId,
+      action: 'updated',
+      title: 'Trip Updated',
+      description: 'Trip details updated',
+      travellerId: widget.trip['travellerId'],
+    );
+
     if (!mounted) return;
     Navigator.pop(context);
   }
@@ -106,6 +115,14 @@ class _EditTripScreenState extends ConsumerState<EditTripScreen> {
           'status': 'cancelled',
           'updatedAt': FieldValue.serverTimestamp(),
         });
+
+    await TripTimelineService.log(
+      tripId: widget.tripId,
+      action: 'cancelled',
+      title: 'Trip Cancelled',
+      description: 'Trip cancelled by traveller',
+      travellerId: widget.trip['travellerId'],
+    );
 
     if (!mounted) return;
     Navigator.pop(context);
@@ -122,6 +139,13 @@ class _EditTripScreenState extends ConsumerState<EditTripScreen> {
           'completedAt': FieldValue.serverTimestamp(),
         });
 
+    await TripTimelineService.log(
+      tripId: widget.tripId,
+      action: 'completed',
+      title: 'Trip Completed',
+      description: 'Trip marked as completed',
+      travellerId: widget.trip['travellerId'],
+    );
     if (!mounted) return;
     Navigator.pop(context);
   }

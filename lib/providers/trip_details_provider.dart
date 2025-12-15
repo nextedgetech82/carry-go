@@ -1,4 +1,5 @@
 // providers/trip_actions_provider.dart
+import 'package:carrygo/ui/screens/trip/timeline/trip_timeline_service.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,6 +15,7 @@ class TripActionsController extends StateNotifier<bool> {
   Future<void> updateStatus({
     required String tripId,
     required String status,
+    required Map<String, dynamic> trip,
     required BuildContext context,
   }) async {
     try {
@@ -23,6 +25,14 @@ class TripActionsController extends StateNotifier<bool> {
         'status': status,
         'updatedAt': FieldValue.serverTimestamp(),
       });
+
+      await TripTimelineService.log(
+        tripId: tripId,
+        action: status,
+        title: 'Trip $status',
+        description: 'Trip marked as $status',
+        travellerId: trip['travellerId'],
+      );
 
       if (context.mounted) {
         ScaffoldMessenger.of(
@@ -43,6 +53,7 @@ class TripActionsController extends StateNotifier<bool> {
   /// 🗑️ SOFT DELETE
   Future<void> deleteTrip({
     required String tripId,
+    required Map<String, dynamic> trip,
     required BuildContext context,
   }) async {
     try {
@@ -52,6 +63,14 @@ class TripActionsController extends StateNotifier<bool> {
         'status': 'deleted',
         'deletedAt': FieldValue.serverTimestamp(),
       });
+
+      await TripTimelineService.log(
+        tripId: tripId,
+        action: 'deleted',
+        title: 'Trip Deleted',
+        description: 'Trip deleted by traveller',
+        travellerId: trip['travellerId'],
+      );
 
       ScaffoldMessenger.of(
         context,
