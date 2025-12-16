@@ -1,4 +1,5 @@
 import 'package:carrygo/core/auth/phone_otp_screen.dart';
+import 'package:carrygo/ui/screens/sender/sender_dashboard.dart';
 import 'package:carrygo/ui/screens/signin/signin_screen.dart';
 import 'package:carrygo/ui/screens/signup/phone_otp_screen.dart';
 import 'package:flutter/material.dart';
@@ -12,7 +13,6 @@ import '../signup/signup_screen.dart';
 import '../signup/email_verification_screen.dart';
 import '../signup/role_selection.dart';
 import '../dashboard/traveller_dashboard.dart';
-import '../dashboard/sender_dashboard.dart';
 
 class SplashScreen extends ConsumerWidget {
   const SplashScreen({super.key});

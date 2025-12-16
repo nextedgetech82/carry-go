@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import '../../../core/startup/startup_provider.dart';
 import '../../../core/auth/email_verification_controller.dart';
 
 class EmailVerificationScreen extends ConsumerWidget {
@@ -15,6 +16,8 @@ class EmailVerificationScreen extends ConsumerWidget {
     // 🔁 Listen for verification success
     ref.listen(emailVerificationControllerProvider, (prev, next) {
       if (next.verified) {
+        // Force splash/startup flow to recompute now that email is verified.
+        ref.invalidate(startupProvider);
         Navigator.pushReplacementNamed(context, '/');
       }
     });
