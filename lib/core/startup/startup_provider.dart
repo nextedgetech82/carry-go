@@ -52,6 +52,7 @@ final startupProvider = FutureProvider<StartupResult>((ref) async {
   if (role == 'traveller') {
     return StartupResult.travellerDashboard;
   } else if (role == 'sender') {
+    //return StartupResult.senderDashboard;
     return StartupResult.senderDashboard;
   } else {
     return StartupResult.roleSelection;

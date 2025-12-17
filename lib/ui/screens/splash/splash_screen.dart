@@ -1,4 +1,5 @@
 import 'package:carrygo/core/auth/phone_otp_screen.dart';
+import 'package:carrygo/ui/screens/buyer/dashboard/buyer_dashboard_screen.dart';
 import 'package:carrygo/ui/screens/sender/sender_dashboard.dart';
 import 'package:carrygo/ui/screens/signin/signin_screen.dart';
 import 'package:carrygo/ui/screens/signup/phone_otp_screen.dart';
@@ -46,7 +47,8 @@ class SplashScreen extends ConsumerWidget {
         page = const SigninScreen();
         break;
       case StartupResult.signup:
-        page = const SignupScreen();
+        //page = const SignupScreen();
+        page = const SigninScreen();
         break;
 
       case StartupResult.emailVerification:
@@ -60,7 +62,7 @@ class SplashScreen extends ConsumerWidget {
         break;
 
       case StartupResult.senderDashboard:
-        page = const SenderDashboard();
+        page = const BuyerDashboardScreen();
         break;
 
       case StartupResult.roleSelection:

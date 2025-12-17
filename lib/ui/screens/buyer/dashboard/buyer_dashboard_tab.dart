@@ -1,3 +1,4 @@
+import 'package:carrygo/ui/screens/buyer/my_requests/my_requests_screen.dart';
 import 'package:flutter/material.dart';
 import '../post_request/post_request_screen.dart';
 import '../matching/matching_trips_list.dart';
@@ -10,7 +11,7 @@ class BuyerDashboardTab extends StatelessWidget {
     : this._(key: key, child: const PostRequestScreen());
 
   const BuyerDashboardTab.myRequests({Key? key})
-    : this._(key: key, child: const Center(child: Text('My Requests (Next Step)')));
+    : this._(key: key, child: const MyRequestsScreen());
 
   const BuyerDashboardTab.matchingTrips({Key? key})
     : this._(key: key, child: const MatchingTripsList());
