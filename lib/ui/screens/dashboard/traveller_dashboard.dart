@@ -69,46 +69,57 @@ class _DashboardBody extends ConsumerWidget {
     required this.tripsAsync,
   });
 
-  Future<void> acceptRequest(
+  Future<void> acceptTripRequest(
     BuildContext context,
+    String tripRequestId,
     Map<String, dynamic> r,
   ) async {
     final db = FirebaseFirestore.instance;
 
     await db.runTransaction((tx) async {
       final tripRef = db.collection('trips').doc(r['tripId']);
-      final reqRef = db.collection('requests').doc(r['id']);
+      final trRef = db.collection('trip_requests').doc(tripRequestId);
+      final reqRef = db.collection('requests').doc(r['requestId']);
 
       final tripSnap = await tx.get(tripRef);
-      final available = tripSnap['availableWeightKg'];
+      final available = (tripSnap['availableWeightKg'] as num).toDouble();
+      //final requested = (r['requestedWeight'] as num).toDouble();
+      final requested = (r['requestedWeightKg'] as num).toDouble();
 
-      if (available < r['requestedWeightKg']) {
+      if (available < requested) {
         throw Exception('Not enough available weight');
       }
 
-      tx.update(tripRef, {
-        'availableWeightKg': available - r['requestedWeightKg'],
+      tx.update(tripRef, {'availableWeightKg': available - requested});
+
+      // ✅ Accept mapping
+      tx.update(trRef, {
+        'status': 'accepted',
+        'acceptedAt': FieldValue.serverTimestamp(),
       });
 
-      tx.update(reqRef, {
-        'status': 'accepted',
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+      // ✅ Update buyer request
+      tx.update(reqRef, {'status': 'accepted'});
     });
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Request accepted')));
   }
 
-  Future<void> rejectRequest(
-    BuildContext context,
-    Map<String, dynamic> r,
-  ) async {
-    await FirebaseFirestore.instance.collection('requests').doc(r['id']).update(
-      {'status': 'rejected', 'updatedAt': FieldValue.serverTimestamp()},
-    );
+  Future<void> rejectTripRequest(String tripRequestId) async {
+    await FirebaseFirestore.instance
+        .collection('trip_requests')
+        .doc(tripRequestId)
+        .update({
+          'status': 'rejected',
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final requestsAsync = ref.watch(incomingRequestsProvider);
+    final requestsAsync = ref.watch(incomingTripRequestsProvider);
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -172,8 +183,8 @@ class _DashboardBody extends ConsumerWidget {
 
           requestsAsync.when(
             loading: () => const Padding(
-              padding: EdgeInsets.symmetric(vertical: 12),
-              child: CircularProgressIndicator(),
+              padding: EdgeInsets.symmetric(vertical: 20),
+              child: Center(child: CircularProgressIndicator()),
             ),
             error: (e, _) => Text(
               'Failed to load requests',
@@ -182,7 +193,7 @@ class _DashboardBody extends ConsumerWidget {
             data: (requests) {
               if (requests.isEmpty) {
                 return Padding(
-                  padding: const EdgeInsets.only(bottom: 20),
+                  padding: const EdgeInsets.symmetric(vertical: 20),
                   child: Text(
                     'No incoming requests',
                     style: theme.textTheme.bodySmall,
@@ -191,30 +202,146 @@ class _DashboardBody extends ConsumerWidget {
               }
 
               return Column(
-                children: requests.map<Widget>((r) {
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                children: requests.map<Widget>((doc) {
+                  final r = doc.data();
+                  final tripRequestId = doc.id;
+
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 14),
+                    decoration: BoxDecoration(
+                      color: theme.cardColor,
+                      borderRadius: BorderRadius.circular(18),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.04),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
-                    child: ListTile(
-                      title: Text('${r['fromCity']} → ${r['toCity']}'),
-                      subtitle: Text(
-                        '${r['requestedWeightKg']} kg • ₹${r['totalPrice']}',
-                      ),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.check, color: Colors.green),
-                            onPressed: () => acceptRequest(context, r),
+                    child: FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                      future: FirebaseFirestore.instance
+                          .collection('requests')
+                          .doc(r['requestId'])
+                          .get(),
+                      builder: (context, snap) {
+                        if (!snap.hasData) {
+                          return const Padding(
+                            padding: EdgeInsets.all(16),
+                            child: Text('Loading request...'),
+                          );
+                        }
+
+                        final req = snap.data!.data();
+                        if (req == null) {
+                          return const Padding(
+                            padding: EdgeInsets.all(16),
+                            child: Text('Request not found'),
+                          );
+                        }
+
+                        return Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              /// 🚚 ROUTE
+                              Row(
+                                children: [
+                                  const Icon(Icons.location_on, size: 18),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      '${req['fromCity']} → ${req['toCity']}',
+                                      style: theme.textTheme.titleMedium
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+
+                              const SizedBox(height: 8),
+
+                              /// 📦 ITEM (optional but nice)
+                              if (req['itemName'] != null)
+                                Text(
+                                  req['itemName'],
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: Colors.grey.shade700,
+                                  ),
+                                ),
+
+                              const SizedBox(height: 12),
+
+                              /// 🔢 CHIPS
+                              Wrap(
+                                spacing: 10,
+                                runSpacing: 8,
+                                children: [
+                                  _InfoChip(
+                                    icon: Icons.scale,
+                                    text: '${r['requestedWeightKg']} kg',
+                                  ),
+                                  _InfoChip(
+                                    icon: Icons.currency_rupee,
+                                    text: '₹${r['totalPrice']}',
+                                  ),
+                                ],
+                              ),
+
+                              const SizedBox(height: 16),
+
+                              /// ✅ ACTIONS
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: OutlinedButton.icon(
+                                      icon: const Icon(Icons.close),
+                                      label: const Text('Reject'),
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: Colors.red,
+                                        side: const BorderSide(
+                                          color: Colors.red,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                      ),
+                                      onPressed: () =>
+                                          rejectTripRequest(tripRequestId),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: ElevatedButton.icon(
+                                      icon: const Icon(Icons.check),
+                                      label: const Text('Accept'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.green,
+                                        foregroundColor: Colors.white,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                      ),
+                                      onPressed: () => acceptTripRequest(
+                                        context,
+                                        tripRequestId,
+                                        r,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
-                          IconButton(
-                            icon: const Icon(Icons.close, color: Colors.red),
-                            onPressed: () => rejectRequest(context, r),
-                          ),
-                        ],
-                      ),
+                        );
+                      },
                     ),
                   );
                 }).toList(),
@@ -284,6 +411,32 @@ class _DashboardBody extends ConsumerWidget {
               );
             },
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoChip extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  const _InfoChip({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: Colors.grey.shade700),
+          const SizedBox(width: 6),
+          Text(text, style: const TextStyle(fontSize: 12)),
         ],
       ),
     );
