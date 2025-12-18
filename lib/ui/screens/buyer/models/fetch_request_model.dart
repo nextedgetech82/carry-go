@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class FetchRequestModel {
+  final String id;
+  final String buyerId;
   final String fromCity;
   final String toCity;
   final String itemName;
@@ -8,8 +10,11 @@ class FetchRequestModel {
   final int quantity;
   final double budget;
   final DateTime deadline;
+  final String status;
 
   FetchRequestModel({
+    required this.id,
+    required this.buyerId,
     required this.fromCity,
     required this.toCity,
     required this.itemName,
@@ -17,9 +22,10 @@ class FetchRequestModel {
     required this.quantity,
     required this.budget,
     required this.deadline,
+    required this.status,
   });
 
-  Map<String, dynamic> toMap(String buyerId) {
+  Map<String, dynamic> toMap() {
     return {
       'buyerId': buyerId,
       'fromCity': fromCity,
@@ -29,20 +35,26 @@ class FetchRequestModel {
       'quantity': quantity,
       'budget': budget,
       'deadline': deadline,
-      'status': 'pending',
-      'createdAt': DateTime.now(),
+      'status': status,
+      'createdAt': FieldValue.serverTimestamp(),
     };
   }
 
-  factory FetchRequestModel.fromMap(Map<String, dynamic> map) {
+  factory FetchRequestModel.fromDoc(
+    DocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
+    final d = doc.data()!;
     return FetchRequestModel(
-      fromCity: map['fromCity'],
-      toCity: map['toCity'],
-      itemName: map['itemName'],
-      weight: (map['weight'] ?? 0).toDouble(),
-      quantity: map['quantity'],
-      budget: (map['budget'] ?? 0).toDouble(),
-      deadline: (map['deadline'] as Timestamp).toDate(),
+      id: doc.id,
+      buyerId: d['buyerId'],
+      fromCity: d['fromCity'],
+      toCity: d['toCity'],
+      itemName: d['itemName'],
+      weight: (d['weight'] ?? 0).toDouble(),
+      quantity: d['quantity'],
+      budget: (d['budget'] ?? 0).toDouble(),
+      deadline: (d['deadline'] as Timestamp).toDate(),
+      status: d['status'],
     );
   }
 }

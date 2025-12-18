@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 
 class TripMatchFilter {
   final String from;
@@ -34,29 +35,58 @@ final matchingTripsProvider =
       List<QueryDocumentSnapshot<Map<String, dynamic>>>,
       TripMatchFilter
     >((ref, filter) {
-      return FirebaseFirestore.instance
+      final mode = ref.watch(matchModeProvider);
+
+      /// ✅ IMPORTANT: Typed query
+      Query<Map<String, dynamic>> query = FirebaseFirestore.instance
           .collection('trips')
           .where('fromCity', isEqualTo: filter.from)
           .where('toCity', isEqualTo: filter.to)
-          // ✅ ONE range filter only
-          .where(
-            'departureDate',
-            isLessThanOrEqualTo: Timestamp.fromDate(filter.deadline),
-          )
-          .orderBy('departureDate') // REQUIRED
-          .snapshots()
-          .map((snapshot) {
-            return snapshot.docs.where((doc) {
-              final data = doc.data();
+          .orderBy('departureDate');
 
-              final availableWeight = (data['availableWeightKg'] ?? 0)
-                  .toDouble();
+      /// 🔹 Smart Match → apply deadline filter
+      if (mode == MatchMode.smart) {
+        query = query.where(
+          'departureDate',
+          isLessThanOrEqualTo: Timestamp.fromDate(filter.deadline),
+        );
+      }
 
-              final arrivalDate = (data['arrivalDate'] as Timestamp).toDate();
+      return query.snapshots().map((
+        QuerySnapshot<Map<String, dynamic>> snapshot,
+      ) {
+        return snapshot.docs.where((doc) {
+          final data = doc.data();
 
-              // ✅ Client-side checks
-              return availableWeight >= filter.minWeight &&
-                  !arrivalDate.isBefore(filter.deadline);
-            }).toList();
-          });
+          final availableWeight = (data['availableWeightKg'] ?? 0).toDouble();
+
+          final arrivalDate = (data['arrivalDate'] as Timestamp).toDate();
+
+          if (mode == MatchMode.smart) {
+            return availableWeight >= filter.minWeight &&
+                !arrivalDate.isBefore(filter.deadline);
+          } else {
+            /// 🔥 Explore mode → relaxed
+            return availableWeight > 0;
+          }
+        }).toList();
+      });
     });
+
+enum MatchMode { smart, explore }
+
+final matchModeProvider = StateProvider<MatchMode>((ref) => MatchMode.smart);
+
+final travellerVerificationProvider = StreamProvider.family<bool, String>((
+  ref,
+  userId,
+) {
+  return FirebaseFirestore.instance
+      .collection('users')
+      .doc(userId)
+      .snapshots()
+      .map((doc) {
+        if (!doc.exists) return false;
+        return doc.data()?['emailVerified'] == true;
+      });
+});

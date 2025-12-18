@@ -11,6 +11,7 @@ class MatchingTripsList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final filter = ref.watch(buyerTripFilterProvider);
+    final mode = ref.watch(matchModeProvider);
 
     if (filter == null) {
       return const _EmptySearchState();
@@ -18,39 +19,94 @@ class MatchingTripsList extends ConsumerWidget {
 
     final tripsAsync = ref.watch(matchingTripsProvider(filter));
 
-    return tripsAsync.when(
-      loading: () => const _LoadingState(),
-      error: (e, _) => Center(child: Text('Error: $e')),
-      data: (docs) {
-        if (docs.isEmpty) {
-          return const _NoMatchState();
-        }
+    return Column(
+      children: [
+        /// 🔹 SMART / EXPLORE TOGGLE
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: ChoiceChip(
+                  label: const Text('Smart Match'),
+                  selected: mode == MatchMode.smart,
+                  onSelected: (_) {
+                    ref.read(matchModeProvider.notifier).state =
+                        MatchMode.smart;
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ChoiceChip(
+                  label: const Text('Explore More'),
+                  selected: mode == MatchMode.explore,
+                  onSelected: (_) {
+                    ref.read(matchModeProvider.notifier).state =
+                        MatchMode.explore;
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
 
-        return ListView.separated(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          itemCount: docs.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 10),
-          itemBuilder: (_, i) {
-            //return _TripCard(data: docs[i].data());
-            return _TripCard(doc: docs[i]);
-          },
-        );
-      },
+        /// 🔹 LIST
+        Expanded(
+          child: tripsAsync.when(
+            loading: () => const _LoadingState(),
+            error: (e, _) => Center(child: Text('Error: $e')),
+            data: (docs) {
+              if (docs.isEmpty) {
+                return const _NoMatchState();
+              }
+
+              return ListView.separated(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 8,
+                  horizontal: 12,
+                ),
+                itemCount: docs.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                itemBuilder: (_, i) {
+                  return _TripCard(doc: docs[i], filter: filter, mode: mode);
+                },
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }
 
-class _TripCard extends StatelessWidget {
-  //final Map<String, dynamic> data;
+class _TripCard extends ConsumerWidget {
   final QueryDocumentSnapshot<Map<String, dynamic>> doc;
+  final TripMatchFilter filter;
+  final MatchMode mode;
 
-  const _TripCard({required this.doc});
+  const _TripCard({
+    required this.doc,
+    required this.filter,
+    required this.mode,
+  });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final data = doc.data();
+    final travellerId = data['travellerId'] as String;
+
+    final verificationAsync = ref.watch(
+      travellerVerificationProvider(travellerId),
+    );
+
     final departure = (data['departureDate'] as Timestamp).toDate();
     final arrival = (data['arrivalDate'] as Timestamp).toDate();
+    final availableWeight = (data['availableWeightKg'] ?? 0).toDouble();
+
+    final isPerfectMatch =
+        availableWeight >= filter.minWeight &&
+        !arrival.isBefore(filter.deadline);
 
     return Card(
       elevation: 3,
@@ -60,11 +116,7 @@ class _TripCard extends StatelessWidget {
         onTap: () {
           Navigator.push(
             context,
-            MaterialPageRoute(
-              builder: (_) => TripDetailScreen(
-                tripDoc: doc, // ✅ full Firestore doc
-              ),
-            ),
+            MaterialPageRoute(builder: (_) => TripDetailScreen(tripDoc: doc)),
           );
         },
         child: Padding(
@@ -72,7 +124,7 @@ class _TripCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Route Row
+              /// ROUTE + PRICE
               Row(
                 children: [
                   Expanded(
@@ -88,9 +140,27 @@ class _TripCard extends StatelessWidget {
                 ],
               ),
 
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
 
-              // Dates
+              /// MATCH BADGE
+              //_MatchBadge(perfect: isPerfectMatch, mode: mode),
+              /// MATCH + VERIFICATION BADGES
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  _MatchBadge(perfect: isPerfectMatch, mode: mode),
+                  verificationAsync.when(
+                    loading: () => const _VerificationSkeleton(),
+                    error: (_, __) => const _VerificationBadge(verified: false),
+                    data: (verified) => _VerificationBadge(verified: verified),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 8),
+
+              /// DATES
               Row(
                 children: [
                   const Icon(
@@ -100,7 +170,7 @@ class _TripCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    '${_fmt(departure)}  →  ${_fmt(arrival)}',
+                    '${_fmt(departure)} → ${_fmt(arrival)}',
                     style: const TextStyle(fontSize: 13),
                   ),
                 ],
@@ -108,7 +178,7 @@ class _TripCard extends StatelessWidget {
 
               const SizedBox(height: 10),
 
-              // Info Chips
+              /// INFO
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -126,7 +196,6 @@ class _TripCard extends StatelessWidget {
 
               const SizedBox(height: 12),
 
-              // CTA
               Align(
                 alignment: Alignment.centerRight,
                 child: Text(
@@ -146,6 +215,46 @@ class _TripCard extends StatelessWidget {
   }
 
   String _fmt(DateTime d) => '${d.day}/${d.month}/${d.year}';
+}
+
+class _MatchBadge extends StatelessWidget {
+  final bool perfect;
+  final MatchMode mode;
+
+  const _MatchBadge({required this.perfect, required this.mode});
+
+  @override
+  Widget build(BuildContext context) {
+    Color color;
+    String text;
+
+    if (perfect) {
+      color = Colors.green;
+      text = 'Perfect Match';
+    } else if (mode == MatchMode.explore) {
+      color = Colors.orange;
+      text = 'Explore Match';
+    } else {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+      ),
+    );
+  }
 }
 
 class _PriceTag extends StatelessWidget {
@@ -247,5 +356,58 @@ class _LoadingState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+  }
+}
+
+class _VerificationBadge extends StatelessWidget {
+  final bool verified;
+
+  const _VerificationBadge({required this.verified});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = verified ? Colors.blue : Colors.grey;
+    final icon = verified ? Icons.verified : Icons.info_outline;
+    final text = verified ? 'Verified Traveller' : 'Not Verified';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 6),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VerificationSkeleton extends StatelessWidget {
+  const _VerificationSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 120,
+      height: 22,
+      decoration: BoxDecoration(
+        color: Colors.grey.shade300,
+        borderRadius: BorderRadius.circular(20),
+      ),
+    );
   }
 }

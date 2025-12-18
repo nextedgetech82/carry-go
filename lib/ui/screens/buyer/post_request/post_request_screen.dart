@@ -1,5 +1,6 @@
 import 'package:carrygo/ui/screens/buyer/matching/buyer_trip_filter_provider.dart';
 import 'package:carrygo/ui/screens/buyer/matching/matching_trips_provider.dart';
+import 'package:carrygo/ui/screens/buyer/models/fetch_request_input.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/fetch_request_model.dart';
@@ -115,7 +116,7 @@ class _PostRequestScreenState extends ConsumerState<PostRequestScreen> {
                           _deadline == null)
                         return;
 
-                      final model = FetchRequestModel(
+                      final model = FetchRequestInput(
                         fromCity: _fromCity.text.trim(),
                         toCity: _toCity.text.trim(),
                         itemName: _item.text.trim(),
