@@ -116,6 +116,18 @@ class _DashboardBody extends ConsumerWidget {
         'acceptedAt': FieldValue.serverTimestamp(),
       });
 
+      /// 🔹 CREATE CHAT
+      final chatRef = db.collection('chats').doc(r['requestId']);
+
+      tx.set(chatRef, {
+        'requestId': r['requestId'],
+        'buyerId': r['buyerId'],
+        'travellerId': r['travellerId'],
+        'lastMessage': 'Chat started',
+        'lastSenderId': 'system',
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
       /// 🔹 2️⃣ AUTO-REJECT REMAINING REQUESTS
       /// Auto Reject Pending Requests
       if (tripCompleted) {

@@ -11,9 +11,7 @@ final appRouter = AppRouter();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   runApp(const ProviderScope(child: MyApp()));
 }
@@ -33,3 +31,7 @@ class MyApp extends StatelessWidget {
     );
   }
 }
+
+// match /{document=**} {
+//       allow read, write: if true;
+//     }
