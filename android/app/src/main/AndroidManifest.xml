@@ -3,6 +3,17 @@
         android:label="Travel Fetcher"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <queries>
+            <intent>
+                <action android:name="android.intent.action.VIEW" />
+                <data android:scheme="tel" />
+            </intent>
+            <intent>
+                <action android:name="android.intent.action.VIEW" />
+                <data android:scheme="https" />
+            </intent>
+        </queries>
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

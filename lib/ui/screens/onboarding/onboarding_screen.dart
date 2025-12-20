@@ -22,8 +22,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     ),
     _OnboardingPageData(
       icon: Icons.local_shipping,
-      title: 'Send Items Securely',
-      subtitle: 'Send items safely through verified travelers worldwide.',
+      title: 'Fetch Items Securely',
+      subtitle:
+          'Buy send / receive items safely through verified travellers worldwide.',
     ),
     _OnboardingPageData(
       icon: Icons.verified_user,

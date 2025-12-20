@@ -77,6 +77,8 @@ class _DashboardBody extends ConsumerWidget {
     final db = FirebaseFirestore.instance;
 
     await db.runTransaction((tx) async {
+      bool tripCompleted = false;
+
       final tripRef = db.collection('trips').doc(r['tripId']);
       final trRef = db.collection('trip_requests').doc(tripRequestId);
       final reqRef = db.collection('requests').doc(r['requestId']);
@@ -90,16 +92,38 @@ class _DashboardBody extends ConsumerWidget {
         throw Exception('Not enough available weight');
       }
 
-      tx.update(tripRef, {'availableWeightKg': available - requested});
+      final remaining = available - requested;
+      tripCompleted = remaining <= 0;
 
-      // ✅ Accept mapping
+      /// 🔹 UPDATE TRIP
+      tx.update(tripRef, {
+        'availableWeightKg': remaining,
+        'status': tripCompleted ? 'completed' : 'active',
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      /// 🔹 Accept current trip_request
       tx.update(trRef, {
         'status': 'accepted',
         'acceptedAt': FieldValue.serverTimestamp(),
       });
 
+      //tx.update(tripRef, {'availableWeightKg': available - requested});
+
+      /// 🔹 ACCEPT BUYER REQUEST
+      tx.update(reqRef, {
+        'status': 'accepted',
+        'acceptedAt': FieldValue.serverTimestamp(),
+      });
+
+      /// 🔹 2️⃣ AUTO-REJECT REMAINING REQUESTS
+      /// Auto Reject Pending Requests
+      if (tripCompleted) {
+        await _rejectPendingRequests(r['tripId'], tripRequestId);
+      }
+
       // ✅ Update buyer request
-      tx.update(reqRef, {'status': 'accepted'});
+      //tx.update(reqRef, {'status': 'accepted'});
     });
 
     ScaffoldMessenger.of(
@@ -115,6 +139,42 @@ class _DashboardBody extends ConsumerWidget {
           'status': 'rejected',
           'updatedAt': FieldValue.serverTimestamp(),
         });
+  }
+
+  Future<void> _rejectPendingRequests(
+    String tripId,
+    String acceptedTripRequestId,
+  ) async {
+    final db = FirebaseFirestore.instance;
+    final batch = db.batch();
+
+    final pendingRequests = await db
+        .collection('trip_requests')
+        .where('tripId', isEqualTo: tripId)
+        .where('status', isEqualTo: 'pending')
+        .get();
+
+    for (final doc in pendingRequests.docs) {
+      if (doc.id == acceptedTripRequestId) continue;
+
+      final data = doc.data();
+
+      /// Reject trip_request
+      batch.update(doc.reference, {
+        'status': 'rejected',
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      /// Reject buyer request
+      if (data['requestId'] != null) {
+        batch.update(db.collection('requests').doc(data['requestId']), {
+          'status': 'rejected',
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
+    }
+
+    await batch.commit();
   }
 
   @override
@@ -565,8 +625,8 @@ class _TripRow extends StatelessWidget {
   final String toCity;
   final dynamic departureDate; // Firestore Timestamp
   final dynamic arrivalDate; // Firestore Timestamp
-  final int pricePerKg;
-  final int availableWeight; // NEW
+  final num pricePerKg;
+  final num availableWeight; // NEW
   final String status; // active / completed / cancelled
 
   const _TripRow({
@@ -578,6 +638,11 @@ class _TripRow extends StatelessWidget {
     required this.availableWeight,
     required this.status,
   });
+
+  String _fmtKg(num value) {
+    // show max 2 decimals, remove trailing zeros
+    return value.toStringAsFixed(2).replaceAll(RegExp(r'\.?0+$'), '');
+  }
 
   String _formatDate(dynamic date) {
     if (date == null) return '';
@@ -675,12 +740,12 @@ class _TripRow extends StatelessWidget {
                     Icon(Icons.inventory_2, size: 14, color: theme.hintColor),
                     const SizedBox(width: 6),
                     Text(
-                      '$availableWeight kg available',
+                      '${_fmtKg(availableWeight)} kg available',
                       style: theme.textTheme.bodySmall,
                     ),
                     const SizedBox(width: 16),
                     Text(
-                      '₹$pricePerKg / kg',
+                      '₹${_fmtKg(pricePerKg)} / kg',
                       style: theme.textTheme.bodySmall?.copyWith(
                         fontWeight: FontWeight.w600,
                         color: theme.colorScheme.primary,

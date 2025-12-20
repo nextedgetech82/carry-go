@@ -1,3 +1,4 @@
+import 'package:carrygo/ui/screens/buyer/my_requests/buyer_request_detail_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'my_requests_provider.dart';
@@ -22,8 +23,12 @@ class MyRequestsScreen extends ConsumerWidget {
           itemCount: docs.length,
           separatorBuilder: (_, __) => const SizedBox(height: 8),
           itemBuilder: (_, i) {
-            final d = docs[i].data();
-            return _RequestCard(data: d);
+            //final d = docs[i].data();
+            //return _RequestCard(data: d);
+            final doc = docs[i];
+            final d = doc.data();
+
+            return _RequestCard(data: d, requestId: doc.id);
           },
         );
       },
@@ -33,8 +38,9 @@ class MyRequestsScreen extends ConsumerWidget {
 
 class _RequestCard extends StatelessWidget {
   final Map<String, dynamic> data;
+  final String requestId;
 
-  const _RequestCard({required this.data});
+  const _RequestCard({required this.data, required this.requestId});
 
   @override
   Widget build(BuildContext context) {
@@ -46,7 +52,13 @@ class _RequestCard extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
         onTap: () {
-          // NEXT: Open Request Detail Screen
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) =>
+                  BuyerRequestDetailScreen(request: data, requestId: requestId),
+            ),
+          );
         },
         child: Padding(
           padding: const EdgeInsets.all(14),
