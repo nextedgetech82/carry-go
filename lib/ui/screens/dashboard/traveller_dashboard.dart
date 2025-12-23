@@ -1,6 +1,9 @@
 import 'package:carrygo/core/startup/startup_provider.dart';
 import 'package:carrygo/providers/my_trips_provider.dart';
 import 'package:carrygo/providers/user_profile_provider.dart';
+import 'package:carrygo/ui/screens/chat/chat_screen.dart';
+import 'package:carrygo/ui/screens/chat/traveler_chatstream_provider.dart';
+import 'package:carrygo/ui/screens/dashboard/accept_trip_provider.dart';
 import 'package:carrygo/ui/screens/sender/incoming_requests_provider.dart';
 import 'package:carrygo/ui/screens/trip/add_trip_screen.dart';
 import 'package:carrygo/ui/screens/trip/trip_details_screen.dart';
@@ -11,6 +14,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 class TravellerDashboard extends ConsumerWidget {
   const TravellerDashboard({super.key});
+
+  //String profileFullName = "";
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -46,11 +51,409 @@ class TravellerDashboard extends ConsumerWidget {
         data: (profile) {
           final fullName =
               '${profile['firstName'] ?? ''} ${profile['lastName'] ?? ''}';
+          //profileFullName = fullName;
 
-          return _DashboardBody(
-            theme: theme,
-            fullName: fullName.trim(),
-            tripsAsync: tripsAsync,
+          return DefaultTabController(
+            length: 2,
+            child: Column(
+              children: [
+                /// 🔹 TAB BAR
+                Container(
+                  color: theme.scaffoldBackgroundColor,
+                  child: TabBar(
+                    labelColor: theme.colorScheme.primary,
+                    unselectedLabelColor: Colors.grey,
+                    indicatorColor: theme.colorScheme.primary,
+                    tabs: const [
+                      Tab(icon: Icon(Icons.dashboard), text: 'Dashboard'),
+                      //Tab(icon: Icon(Icons.inbox), text: 'Requests'),
+                      Tab(icon: Icon(Icons.chat), text: 'Chats'),
+                    ],
+                  ),
+                ),
+
+                /// 🔹 TAB CONTENT
+                Expanded(
+                  child: TabBarView(
+                    children: [
+                      /// 1️⃣ Dashboard
+                      _DashboardBody(
+                        theme: theme,
+                        fullName: fullName.trim(),
+                        tripsAsync: tripsAsync,
+                      ),
+                      // TravellerDashboardTab(
+                      //   theme: theme,
+                      //   fullName: fullName.trim(),
+                      //   tripsAsync: tripsAsync,
+                      // ),
+
+                      /// 2️⃣ Incoming Requests
+                      //IncomingRequestsTab(theme: theme),
+
+                      /// 3️⃣ Accepted Requests (Chats)
+                      AcceptedRequestsTab(theme: theme),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+// class TravellerDashboardTab extends ConsumerWidget {
+//   final ThemeData theme;
+//   final String fullName;
+//   final AsyncValue tripsAsync;
+
+//   const TravellerDashboardTab({
+//     required this.theme,
+//     required this.fullName,
+//     required this.tripsAsync,
+//   });
+
+//   @override
+//   Widget build(BuildContext context, WidgetRef ref) {
+//     return SingleChildScrollView(
+//       padding: const EdgeInsets.all(20),
+//       child: Column(
+//         crossAxisAlignment: CrossAxisAlignment.start,
+//         children: [
+//           _Header(theme: theme, fullName: fullName),
+
+//           const SizedBox(height: 24),
+
+//           Row(
+//             children: const [
+//               _StatCard(
+//                 title: 'Total Earnings',
+//                 value: '₹0',
+//                 icon: Icons.currency_rupee,
+//               ),
+//               SizedBox(width: 16),
+//               _StatCard(title: 'Trips', value: '0', icon: Icons.flight_takeoff),
+//             ],
+//           ),
+
+//           const SizedBox(height: 32),
+
+//           Text(
+//             'My Trips',
+//             style: theme.textTheme.titleMedium?.copyWith(
+//               fontWeight: FontWeight.bold,
+//             ),
+//           ),
+
+//           const SizedBox(height: 12),
+
+//           tripsAsync.when(
+//             loading: () => const Center(child: CircularProgressIndicator()),
+//             error: (e, _) => Text(e.toString()),
+//             data: (trips) {
+//               if (trips.isEmpty) return _EmptyTrips(theme: theme);
+
+//               return Column(
+//                 children: trips.map<Widget>((trip) {
+//                   return _TripRow(
+//                     fromCity: trip['fromCity'],
+//                     toCity: trip['toCity'],
+//                     departureDate: trip['departureDate'],
+//                     arrivalDate: trip['arrivalDate'],
+//                     pricePerKg: trip['pricePerKg'],
+//                     availableWeight: trip['availableWeightKg'],
+//                     status: trip['status'],
+//                   );
+//                 }).toList(),
+//               );
+//             },
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+// }
+
+class IncomingRequestsTab extends ConsumerWidget {
+  final ThemeData theme;
+  const IncomingRequestsTab({required this.theme});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final requestsAsync = ref.watch(incomingTripRequestsProvider);
+
+    return requestsAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (_, __) => const Center(child: Text('Failed to load requests')),
+      data: (requests) {
+        if (requests.isEmpty) {
+          return const Center(child: Text('No incoming requests'));
+        }
+
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: requests.map((doc) {
+            final r = doc.data();
+
+            return Card(
+              child: ListTile(
+                title: Text('${r['fromCity']} → ${r['toCity']}'),
+                subtitle: Text(
+                  '${r['itemName']} • ${r['requestedWeightKg']} kg',
+                ),
+                trailing: const Icon(Icons.chevron_right),
+              ),
+            );
+          }).toList(),
+        );
+      },
+    );
+  }
+}
+
+class AcceptedRequestsTab extends ConsumerWidget {
+  final ThemeData theme;
+  const AcceptedRequestsTab({required this.theme});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final acceptedAsync = ref.watch(acceptedTripRequestsProvider);
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+
+    return acceptedAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (_, __) =>
+          const Center(child: Text('Failed to load accepted requests')),
+      data: (snapshot) {
+        final docs = snapshot.docs;
+
+        if (docs.isEmpty) {
+          return const Center(child: Text('No accepted requests yet'));
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: docs.length,
+          itemBuilder: (context, index) {
+            final r = docs[index].data();
+            final requestId = docs[index].id;
+
+            return _AcceptedRequestCard(
+              theme: theme,
+              requestId: requestId,
+              data: r,
+              uid: uid,
+              otherUserId: r['buyerId'],
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _AcceptedRequestCard extends ConsumerWidget {
+  final ThemeData theme;
+  final String requestId;
+  final Map<String, dynamic> data;
+  final String uid;
+  final String otherUserId; // buyerId
+
+  const _AcceptedRequestCard({
+    required this.theme,
+    required this.requestId,
+    required this.data,
+    required this.uid,
+    required this.otherUserId,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final chatId = (data['requestId'] as String?) ?? requestId;
+    final chatAsync = ref.watch(chatByRequestProvider(chatId));
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        stream: FirebaseFirestore.instance
+            .collection('users')
+            .doc(otherUserId)
+            .snapshots(),
+        builder: (context, userSnap) {
+          final user = userSnap.data?.data();
+          final buyerName =
+              '${user?['firstName'] ?? ''} ${user?['lastName'] ?? ''}'.trim();
+
+          final initials = buyerName.isNotEmpty
+              ? buyerName
+                    .split(' ')
+                    .map((e) => e.isNotEmpty ? e[0] : '')
+                    .take(2)
+                    .join()
+              : 'B';
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              /// ───── Buyer Header ─────
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 22,
+                    backgroundColor: theme.colorScheme.primary.withOpacity(
+                      0.15,
+                    ),
+                    child: Text(
+                      initials.toUpperCase(),
+                      style: TextStyle(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          buyerName.isEmpty ? 'Buyer' : buyerName,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          'Accepted Request',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: Colors.green,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 14),
+
+              /// ───── Route Pill ─────
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.location_on, size: 16),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        '${data['fromCity']} → ${data['toCity']}',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 10),
+
+              /// ───── Item Name ─────
+              if (data['itemName'] != null &&
+                  data['itemName'].toString().isNotEmpty)
+                Text(data['itemName'], style: theme.textTheme.bodyMedium),
+
+              const SizedBox(height: 10),
+
+              /// ───── Info Chips ─────
+              Wrap(
+                spacing: 10,
+                runSpacing: 8,
+                children: [
+                  _InfoChip(
+                    icon: Icons.scale,
+                    text: '${data['requestedWeightKg']} kg',
+                  ),
+                  _InfoChip(
+                    icon: Icons.currency_rupee,
+                    text: '₹${data['totalPrice']}',
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 16),
+
+              /// ───── Chat Button ─────
+              chatAsync.when(
+                loading: () => const SizedBox.shrink(),
+                error: (_, __) => const SizedBox.shrink(),
+                data: (chatSnap) {
+                  final chat = chatSnap.data();
+                  final unread = chat != null && chat['lastSenderId'] != uid;
+
+                  return SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: unread
+                            ? Colors.red
+                            : theme.colorScheme.primary,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ChatScreen(
+                              chatId: chatId,
+                              otherUserName: buyerName.isEmpty
+                                  ? 'Buyer'
+                                  : buyerName,
+                            ),
+                          ),
+                        );
+                      },
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.chat_bubble_outline, size: 18),
+                          const SizedBox(width: 8),
+                          Text(
+                            unread ? 'New Message' : 'Open Chat',
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
           );
         },
       ),
@@ -111,10 +514,10 @@ class _DashboardBody extends ConsumerWidget {
       //tx.update(tripRef, {'availableWeightKg': available - requested});
 
       /// 🔹 ACCEPT BUYER REQUEST
-      tx.update(reqRef, {
-        'status': 'accepted',
-        'acceptedAt': FieldValue.serverTimestamp(),
-      });
+      // tx.update(reqRef, {
+      //   'status': 'accepted',
+      //   'acceptedAt': FieldValue.serverTimestamp(),
+      // });
 
       /// 🔹 CREATE CHAT
       final chatRef = db.collection('chats').doc(r['requestId']);
@@ -192,6 +595,7 @@ class _DashboardBody extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final requestsAsync = ref.watch(incomingTripRequestsProvider);
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -291,129 +695,100 @@ class _DashboardBody extends ConsumerWidget {
                         ),
                       ],
                     ),
-                    child: FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                      future: FirebaseFirestore.instance
-                          .collection('requests')
-                          .doc(r['requestId'])
-                          .get(),
-                      builder: (context, snap) {
-                        if (!snap.hasData) {
-                          return const Padding(
-                            padding: EdgeInsets.all(16),
-                            child: Text('Loading request...'),
-                          );
-                        }
-
-                        final req = snap.data!.data();
-                        if (req == null) {
-                          return const Padding(
-                            padding: EdgeInsets.all(16),
-                            child: Text('Request not found'),
-                          );
-                        }
-
-                        return Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          /// 🚚 ROUTE
+                          Row(
                             children: [
-                              /// 🚚 ROUTE
-                              Row(
-                                children: [
-                                  const Icon(Icons.location_on, size: 18),
-                                  const SizedBox(width: 6),
-                                  Expanded(
-                                    child: Text(
-                                      '${req['fromCity']} → ${req['toCity']}',
-                                      style: theme.textTheme.titleMedium
-                                          ?.copyWith(
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-
-                              const SizedBox(height: 8),
-
-                              /// 📦 ITEM (optional but nice)
-                              if (req['itemName'] != null)
-                                Text(
-                                  req['itemName'],
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: Colors.grey.shade700,
+                              const Icon(Icons.location_on, size: 18),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  '${r['fromCity']} → ${r['toCity']}',
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
-
-                              const SizedBox(height: 12),
-
-                              /// 🔢 CHIPS
-                              Wrap(
-                                spacing: 10,
-                                runSpacing: 8,
-                                children: [
-                                  _InfoChip(
-                                    icon: Icons.scale,
-                                    text: '${r['requestedWeightKg']} kg',
-                                  ),
-                                  _InfoChip(
-                                    icon: Icons.currency_rupee,
-                                    text: '₹${r['totalPrice']}',
-                                  ),
-                                ],
-                              ),
-
-                              const SizedBox(height: 16),
-
-                              /// ✅ ACTIONS
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: OutlinedButton.icon(
-                                      icon: const Icon(Icons.close),
-                                      label: const Text('Reject'),
-                                      style: OutlinedButton.styleFrom(
-                                        foregroundColor: Colors.red,
-                                        side: const BorderSide(
-                                          color: Colors.red,
-                                        ),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                        ),
-                                      ),
-                                      onPressed: () =>
-                                          rejectTripRequest(tripRequestId),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: ElevatedButton.icon(
-                                      icon: const Icon(Icons.check),
-                                      label: const Text('Accept'),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.green,
-                                        foregroundColor: Colors.white,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                        ),
-                                      ),
-                                      onPressed: () => acceptTripRequest(
-                                        context,
-                                        tripRequestId,
-                                        r,
-                                      ),
-                                    ),
-                                  ),
-                                ],
                               ),
                             ],
                           ),
-                        );
-                      },
+
+                          const SizedBox(height: 8),
+
+                          /// 📦 ITEM
+                          if (r['itemName'] != null &&
+                              r['itemName'].toString().isNotEmpty)
+                            Text(
+                              r['itemName'],
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: Colors.grey.shade700,
+                              ),
+                            ),
+
+                          const SizedBox(height: 12),
+
+                          /// 🔢 CHIPS
+                          Wrap(
+                            spacing: 10,
+                            runSpacing: 8,
+                            children: [
+                              _InfoChip(
+                                icon: Icons.scale,
+                                text: '${r['requestedWeightKg']} kg',
+                              ),
+                              _InfoChip(
+                                icon: Icons.currency_rupee,
+                                text: '₹${r['totalPrice']}',
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 16),
+
+                          /// ✅ ACTIONS
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  icon: const Icon(Icons.close),
+                                  label: const Text('Reject'),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: Colors.red,
+                                    side: const BorderSide(color: Colors.red),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                  onPressed: () =>
+                                      rejectTripRequest(tripRequestId),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  icon: const Icon(Icons.check),
+                                  label: const Text('Accept'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.green,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                  onPressed: () => acceptTripRequest(
+                                    context,
+                                    tripRequestId,
+                                    r,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   );
                 }).toList(),

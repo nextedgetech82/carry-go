@@ -40,6 +40,7 @@ final matchingTripsProvider =
       /// ✅ IMPORTANT: Typed query
       Query<Map<String, dynamic>> query = FirebaseFirestore.instance
           .collection('trips')
+          .where('status', isEqualTo: 'active') // ⭐ REQUIRED
           .where('fromCity', isEqualTo: filter.from)
           .where('toCity', isEqualTo: filter.to)
           .orderBy('departureDate');
