@@ -1,5 +1,6 @@
 import 'package:carrygo/ui/screens/buyer/my_requests/my_requests_provider.dart';
 import 'package:carrygo/ui/screens/buyer/request_timeline/request_status.dart';
+import 'package:carrygo/ui/screens/chat/traveler_chatstream_provider.dart';
 import 'package:carrygo/ui/screens/dashboard/accept_trip_provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -24,6 +25,9 @@ class ChatScreen extends ConsumerWidget {
     final theme = Theme.of(context);
 
     final requestAsync = ref.watch(requestByIdProvider(requestId));
+
+    //final otherUserIdAsync = ref.watch(chatOtherUserIdProvider(chatId));
+
     //final requestAsync = ref.watch(requestByIdProvider(chatId));
 
     final messagesStream = FirebaseFirestore.instance
@@ -201,15 +205,79 @@ Widget buildActionBar({
         );
     }
   } else {
-    if (status == RequestStatus.delivered) {
-      return ElevatedButton(
-        onPressed: onCompleted,
-        child: const Text('Confirm Delivery'),
-      );
+    /// 🔥 ACTION BUTTON IN HEADER
+    switch (status) {
+      case RequestStatus.purchased:
+        return infoChip(
+          text: 'Item Purchased',
+          icon: Icons.shopping_bag,
+          color: Colors.orange,
+        );
+      case RequestStatus.inTransit:
+        return infoChip(
+          text: 'In Transit',
+          icon: Icons.local_shipping,
+          color: Colors.purple,
+        );
+      case RequestStatus.delivered:
+        return ElevatedButton(
+          onPressed: onDelivered,
+          child: const Text('Confirm Delivery'),
+        );
     }
+    // if (status == RequestStatus.delivered) {
+    //   return ElevatedButton(
+    //     onPressed: onCompleted,
+    //     child: const Text('Confirm Delivery'),
+    //   );
+    // }
   }
 
   return const SizedBox.shrink();
+}
+
+Widget infoChip({
+  required String text,
+  IconData? icon,
+  Color color = const Color(0xFF2E86DE),
+}) {
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+    decoration: BoxDecoration(
+      gradient: LinearGradient(
+        colors: [color.withOpacity(0.12), color.withOpacity(0.06)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: color.withOpacity(0.35)),
+      boxShadow: [
+        BoxShadow(
+          color: color.withOpacity(0.12),
+          blurRadius: 6,
+          offset: const Offset(0, 3),
+        ),
+      ],
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (icon != null) ...[
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 6),
+        ],
+        Text(
+          text,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: color,
+            letterSpacing: 0.2,
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _ChatBubble extends StatelessWidget {
@@ -354,12 +422,37 @@ class _ChatStatusAction extends ConsumerWidget {
           );
       }
     } else {
-      if (status == RequestStatus.delivered) {
-        return _actionButton(
-          label: 'Confirm Delivery',
-          onTap: () => update(RequestStatus.completed),
-        );
+      switch (status) {
+        case RequestStatus.purchased:
+          return infoChip(
+            text: 'Item Purchased',
+            icon: Icons.shopping_bag,
+            color: Colors.orange,
+          );
+
+        case RequestStatus.inTransit:
+          return infoChip(
+            text: 'In Transit',
+            icon: Icons.local_shipping,
+            color: Colors.purple,
+          );
+        //           infoChip(
+        //   text: 'Delivered',
+        //   icon: Icons.check_circle,
+        //   color: Colors.green,
+        // )
+        case RequestStatus.delivered:
+          return _actionButton(
+            label: 'Confirm Delivery',
+            onTap: () => update(RequestStatus.completed),
+          );
       }
+      // if (status == RequestStatus.delivered) {
+      //   return _actionButton(
+      //     label: 'Confirm Delivery',
+      //     onTap: () => update(RequestStatus.completed),
+      //   );
+      // }
     }
 
     return const SizedBox.shrink();

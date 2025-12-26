@@ -17,6 +17,12 @@ class RequestTimeline extends StatelessWidget {
           error: status == 'rejected',
         ),
         _Divider(),
+        _Step(title: 'Purchased by Traveller', done: status == 'purchased'),
+        _Divider(),
+        _Step(title: 'In Transit', done: status == 'in_transit'),
+        _Divider(),
+        _Step(title: 'Delivered', done: status == 'delivered'),
+        _Divider(),
         _Step(title: 'Trip Completed', done: status == 'completed'),
       ],
     );

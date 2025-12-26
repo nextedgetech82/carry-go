@@ -13,3 +13,45 @@ final travellerChatsProvider =
           .snapshots()
           .map((snap) => snap.docs);
     });
+
+final chatOtherUserIdProvider = StreamProvider.family<String, String>((
+  ref,
+  chatId,
+) {
+  final uid = FirebaseAuth.instance.currentUser!.uid;
+
+  return FirebaseFirestore.instance
+      .collection('chats')
+      .doc(chatId)
+      .snapshots()
+      .map((snap) {
+        if (!snap.exists) throw Exception('Chat not found');
+
+        final data = snap.data()!;
+        final buyerId = data['buyerId'];
+        final travellerId = data['travellerId'];
+
+        return uid == buyerId ? travellerId : buyerId;
+      });
+});
+
+final userNameByIdProvider = StreamProvider.family<String, String>((
+  ref,
+  userId,
+) {
+  return FirebaseFirestore.instance
+      .collection('users')
+      .doc(userId)
+      .snapshots()
+      .map((snap) {
+        if (!snap.exists) return 'User';
+
+        final data = snap.data()!;
+        final first = data['firstName'] ?? '';
+        final last = data['lastName'] ?? '';
+
+        return ('$first $last').trim().isEmpty
+            ? 'User'
+            : ('$first $last').trim();
+      });
+});

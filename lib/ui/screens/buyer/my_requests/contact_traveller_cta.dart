@@ -92,31 +92,31 @@ class ContactTravellerCTA extends StatelessWidget {
                   },
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: OutlinedButton.icon(
-                  icon: const Icon(Icons.chat),
-                  label: const Text('WhatsApp'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  onPressed: () async {
-                    try {
-                      ContactLauncher.whatsapp(
-                        phone,
-                        'Hi, I am contacting you regarding my Travel Fetcher request.',
-                      );
-                    } catch (e) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Unable to make call')),
-                      );
-                    }
-                  },
-                ),
-              ),
+              // const SizedBox(width: 12),
+              // Expanded(
+              //   child: OutlinedButton.icon(
+              //     icon: const Icon(Icons.chat),
+              //     label: const Text('WhatsApp'),
+              //     style: OutlinedButton.styleFrom(
+              //       padding: const EdgeInsets.symmetric(vertical: 14),
+              //       shape: RoundedRectangleBorder(
+              //         borderRadius: BorderRadius.circular(14),
+              //       ),
+              //     ),
+              //     onPressed: () async {
+              //       try {
+              //         ContactLauncher.whatsapp(
+              //           phone,
+              //           'Hi, I am contacting you regarding my Travel Fetcher request.',
+              //         );
+              //       } catch (e) {
+              //         ScaffoldMessenger.of(context).showSnackBar(
+              //           const SnackBar(content: Text('Unable to make call')),
+              //         );
+              //       }
+              //     },
+              //   ),
+              // ),
             ],
           ),
         ],

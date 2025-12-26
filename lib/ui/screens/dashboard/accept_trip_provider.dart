@@ -10,7 +10,17 @@ final acceptedTripRequestsProvider =
       return FirebaseFirestore.instance
           .collection('trip_requests')
           .where('travellerId', isEqualTo: uid)
-          .where('status', isEqualTo: 'accepted')
+          .where(
+            'status',
+            whereIn: [
+              'accepted',
+              'purchased',
+              'in_transit',
+              'delivered',
+              'completed',
+              'cancelled',
+            ],
+          )
           .orderBy('acceptedAt', descending: true)
           .snapshots();
     });
@@ -61,14 +71,21 @@ Future<void> updateRequestStatus({
 
   await db.runTransaction((tx) async {
     tx.update(trRef, {
-      'status': RequestStatus.purchased,
+      'status': newStatus,
       'updatedAt': FieldValue.serverTimestamp(),
     });
 
     tx.update(reqRef, {
-      'status': RequestStatus.purchased,
+      'status': newStatus,
       'updatedAt': FieldValue.serverTimestamp(),
     });
+
+    // tx.set(db.collection('chats').doc(chatId).collection('messages').doc(), {
+    //   'type': 'system',
+    //   'text': 'Item marked as Purchased',
+    //   'createdAt': FieldValue.serverTimestamp(),
+    // });
+
     //final reqRef = db.collection('requests').doc(r['requestId']);
   });
   //final uid = FirebaseAuth.instance.currentUser!.uid;

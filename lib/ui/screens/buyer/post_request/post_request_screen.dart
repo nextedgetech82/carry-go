@@ -1,10 +1,17 @@
 import 'package:carrygo/ui/screens/buyer/matching/buyer_trip_filter_provider.dart';
 import 'package:carrygo/ui/screens/buyer/matching/matching_trips_provider.dart';
 import 'package:carrygo/ui/screens/buyer/models/fetch_request_input.dart';
+import 'package:carrygo/ui/screens/trip/airport/airport_field.dart';
+import 'package:carrygo/ui/screens/trip/airport/airport_model.dart';
+import 'package:carrygo/ui/screens/trip/airport/airport_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/fetch_request_model.dart';
 import 'post_request_provider.dart';
+
+// final airportProvider = FutureProvider<List<Airport>>((ref) async {
+//   return AirportRepository.loadAirports();
+// });
 
 class PostRequestScreen extends ConsumerStatefulWidget {
   const PostRequestScreen({super.key});
@@ -28,6 +35,7 @@ class _PostRequestScreenState extends ConsumerState<PostRequestScreen> {
   @override
   Widget build(BuildContext context) {
     final loading = ref.watch(postRequestProvider);
+    //final airportsAsync = ref.watch(airportProvider);
 
     return Scaffold(
       body: Form(
@@ -62,6 +70,16 @@ class _PostRequestScreenState extends ConsumerState<PostRequestScreen> {
             _SectionTitle(title: 'Route', subtitle: 'Where should it go?'),
             _Card(
               children: [
+                // airportField(
+                //   controller: _fromCity,
+                //   label: 'From Airport',
+                //   icon: Icons.flight_takeoff_outlined,
+                // ),
+                // airportField(
+                //   controller: _toCity,
+                //   label: 'To Airport',
+                //   icon: Icons.flight_land_outlined,
+                // ),
                 _field(
                   _fromCity,
                   'From City',

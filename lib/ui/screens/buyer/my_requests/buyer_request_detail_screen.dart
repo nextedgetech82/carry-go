@@ -27,7 +27,17 @@ class BuyerRequestDetailScreen extends StatelessWidget {
         .collection('trip_requests')
         .where('buyerId', isEqualTo: request['buyerId'])
         //.orderBy('acceptedAt', descending: true) // 🔥 IMPORTANT
-        .where('status', whereIn: ['accepted', 'pending'])
+        .where(
+          'status',
+          whereIn: [
+            'accepted',
+            'purchased',
+            'in_transit',
+            'delivered',
+            'completed',
+            'cancelled',
+          ],
+        )
         .limit(1)
         .snapshots();
 
@@ -60,6 +70,7 @@ class BuyerRequestDetailScreen extends StatelessWidget {
                 final tr = trDoc.data() as Map<String, dynamic>;
                 final tripStatus = tr['status'] as String;
                 final travellerId = tr['travellerId'];
+                final trip_RequestId = trDoc.id;
 
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -118,12 +129,18 @@ class BuyerRequestDetailScreen extends StatelessWidget {
                     const SizedBox(height: 24),
 
                     /// ───────────────── CTA SECTION ─────────────────
-                    if (tripStatus == 'accepted')
+                    if (tripStatus == 'accepted' ||
+                        tripStatus == 'purchased' ||
+                        tripStatus == 'in_transit' ||
+                        tripStatus == 'delivered' ||
+                        tripStatus == 'cancelled' ||
+                        tripStatus == 'completed')
                       _AcceptedCTA(
                         //context: context,
                         travellerId: travellerId,
                         requestId: requestId,
                         request: request,
+                        tripRequestId: trip_RequestId,
                       ),
 
                     if (tripStatus == 'rejected') _RejectedInfo(),
@@ -199,6 +216,7 @@ class _WaitingForTraveller extends StatelessWidget {
 class _AcceptedCTA extends StatelessWidget {
   //final BuildContext context;
   final String travellerId;
+  final String tripRequestId;
   final String requestId;
   final Map<String, dynamic> request;
 
@@ -207,6 +225,7 @@ class _AcceptedCTA extends StatelessWidget {
     required this.travellerId,
     required this.requestId,
     required this.request,
+    required this.tripRequestId,
   });
 
   Future<void> ensureChatExists({
@@ -268,16 +287,16 @@ class _AcceptedCTA extends StatelessWidget {
                     requestId: requestId,
                   );
 
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ChatScreen(
-                        chatId: requestId,
-                        otherUserName: traveller['firstName'] ?? 'Traveller',
-                        requestId: requestId,
-                      ),
-                    ),
-                  );
+                  // Navigator.push(
+                  //   context,
+                  //   MaterialPageRoute(
+                  //     builder: (_) => ChatScreen(
+                  //       chatId: requestId,
+                  //       otherUserName: traveller['firstName'] ?? 'Traveller',
+                  //       requestId: requestId,
+                  //     ),
+                  //   ),
+                  // );
 
                   Navigator.push(
                     context,
@@ -285,7 +304,8 @@ class _AcceptedCTA extends StatelessWidget {
                       builder: (_) => ChatScreen(
                         chatId: requestId,
                         otherUserName: name,
-                        requestId: requestId,
+                        //requestId: requestId,
+                        requestId: tripRequestId,
                       ),
                     ),
                   );

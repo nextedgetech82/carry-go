@@ -271,6 +271,49 @@ class _AcceptedRequestCard extends ConsumerWidget {
     required this.otherUserId,
   });
 
+  Widget _statusChip(String status) {
+    Color color;
+    String text;
+
+    switch (status) {
+      case RequestStatus.accepted:
+        color = Colors.blue;
+        text = 'Accepted';
+        break;
+
+      case RequestStatus.purchased:
+        color = Colors.orange;
+        text = 'Item Purchased';
+        break;
+
+      case RequestStatus.inTransit:
+        color = Colors.purple;
+        text = 'In Transit';
+        break;
+
+      case RequestStatus.delivered:
+        color = Colors.green;
+        text = 'Delivered';
+        break;
+
+      case RequestStatus.completed:
+        color = Colors.green.shade700;
+        text = 'Completed';
+        break;
+
+      default:
+        color = Colors.grey;
+        text = status;
+    }
+
+    return Chip(
+      label: Text(text, style: const TextStyle(fontWeight: FontWeight.w600)),
+      backgroundColor: color.withOpacity(0.12),
+      labelStyle: TextStyle(color: color),
+      side: BorderSide(color: color),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final chatId = (data['requestId'] as String?) ?? requestId;
@@ -416,44 +459,57 @@ class _AcceptedRequestCard extends ConsumerWidget {
                   //final chatReqId = chat?['requestId'];
                   final chatReqId = chat?['trip_request_id'];
 
-                  return SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: unread
-                            ? Colors.red
-                            : theme.colorScheme.primary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
+                  return Column(
+                    children: [
+                      /// 🔹 STATUS CHIP
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: _statusChip(data['status']),
                       ),
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => ChatScreen(
-                              chatId: chatId,
-                              otherUserName: buyerName.isEmpty
-                                  ? 'Buyer'
-                                  : buyerName,
-                              requestId: chatReqId,
+
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: unread
+                                ? Colors.red
+                                : theme.colorScheme.primary,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
                             ),
                           ),
-                        );
-                      },
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.chat_bubble_outline, size: 18),
-                          const SizedBox(width: 8),
-                          Text(
-                            unread ? 'New Message' : 'Open Chat',
-                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ChatScreen(
+                                  chatId: chatId,
+                                  otherUserName: buyerName.isEmpty
+                                      ? 'Buyer'
+                                      : buyerName,
+                                  requestId: chatReqId,
+                                ),
+                              ),
+                            );
+                          },
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.chat_bubble_outline, size: 18),
+                              const SizedBox(width: 8),
+                              Text(
+                                unread ? 'New Message' : 'Open Chat',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
-                    ),
+                    ],
                   );
                 },
               ),
