@@ -1,6 +1,7 @@
 import 'package:carrygo/core/startup/startup_provider.dart';
 import 'package:carrygo/providers/my_trips_provider.dart';
 import 'package:carrygo/providers/user_profile_provider.dart';
+import 'package:carrygo/ui/screens/buyer/request_timeline/request_status.dart';
 import 'package:carrygo/ui/screens/chat/chat_screen.dart';
 import 'package:carrygo/ui/screens/chat/traveler_chatstream_provider.dart';
 import 'package:carrygo/ui/screens/dashboard/accept_trip_provider.dart';
@@ -412,6 +413,8 @@ class _AcceptedRequestCard extends ConsumerWidget {
                 data: (chatSnap) {
                   final chat = chatSnap.data();
                   final unread = chat != null && chat['lastSenderId'] != uid;
+                  //final chatReqId = chat?['requestId'];
+                  final chatReqId = chat?['trip_request_id'];
 
                   return SizedBox(
                     width: double.infinity,
@@ -434,6 +437,7 @@ class _AcceptedRequestCard extends ConsumerWidget {
                               otherUserName: buyerName.isEmpty
                                   ? 'Buyer'
                                   : buyerName,
+                              requestId: chatReqId,
                             ),
                           ),
                         );
@@ -472,7 +476,7 @@ class _DashboardBody extends ConsumerWidget {
     required this.tripsAsync,
   });
 
-  Future<void> acceptTripRequest(
+  Future<void> acceptTripRequest2(
     BuildContext context,
     String tripRequestId,
     Map<String, dynamic> r,
@@ -507,17 +511,22 @@ class _DashboardBody extends ConsumerWidget {
 
       /// 🔹 Accept current trip_request
       tx.update(trRef, {
-        'status': 'accepted',
+        'status': RequestStatus.accepted,
         'acceptedAt': FieldValue.serverTimestamp(),
       });
+
+      // updateRequestStatus(
+      //   requestId: r['requestId'],
+      //   newStatus: RequestStatus.accepted,
+      // );
 
       //tx.update(tripRef, {'availableWeightKg': available - requested});
 
       /// 🔹 ACCEPT BUYER REQUEST
-      // tx.update(reqRef, {
-      //   'status': 'accepted',
-      //   'acceptedAt': FieldValue.serverTimestamp(),
-      // });
+      tx.update(reqRef, {
+        'status': RequestStatus.accepted,
+        'acceptedAt': FieldValue.serverTimestamp(),
+      });
 
       /// 🔹 CREATE CHAT
       final chatRef = db.collection('chats').doc(r['requestId']);
@@ -528,22 +537,80 @@ class _DashboardBody extends ConsumerWidget {
         'travellerId': r['travellerId'],
         'lastMessage': 'Chat started',
         'lastSenderId': 'system',
+        'trip_request_id': tripRequestId,
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
       /// 🔹 2️⃣ AUTO-REJECT REMAINING REQUESTS
       /// Auto Reject Pending Requests
-      if (tripCompleted) {
-        await _rejectPendingRequests(r['tripId'], tripRequestId);
-      }
+      // if (tripCompleted) {
+      //   await _rejectPendingRequests(r['tripId'], tripRequestId);
+      // }
 
       // ✅ Update buyer request
       //tx.update(reqRef, {'status': 'accepted'});
     });
 
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Request accepted')));
+    // ScaffoldMessenger.of(
+    //   context,
+    // ).showSnackBar(const SnackBar(content: Text('Request accepted')));
+  }
+
+  Future<void> acceptTripRequest(
+    String tripRequestId,
+    Map<String, dynamic> r,
+  ) async {
+    final db = FirebaseFirestore.instance;
+    bool tripCompleted = false;
+
+    await db.runTransaction((tx) async {
+      final tripRef = db.collection('trips').doc(r['tripId']);
+      final trRef = db.collection('trip_requests').doc(tripRequestId);
+      final reqRef = db.collection('requests').doc(r['requestId']);
+      final chatRef = db.collection('chats').doc(r['requestId']);
+
+      final tripSnap = await tx.get(tripRef);
+      final available = (tripSnap['availableWeightKg'] as num).toDouble();
+      final requested = (r['requestedWeightKg'] as num).toDouble();
+
+      if (available < requested) {
+        throw Exception('Not enough available weight');
+      }
+
+      final remaining = available - requested;
+      tripCompleted = remaining <= 0;
+
+      tx.update(tripRef, {
+        'availableWeightKg': remaining,
+        'status': tripCompleted ? 'completed' : 'active',
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      tx.update(trRef, {
+        'status': RequestStatus.accepted,
+        'acceptedAt': FieldValue.serverTimestamp(),
+      });
+
+      tx.update(reqRef, {
+        'status': RequestStatus.accepted,
+        'travellerId': r['travellerId'],
+        'acceptedAt': FieldValue.serverTimestamp(),
+      });
+
+      tx.set(chatRef, {
+        'requestId': r['requestId'],
+        'buyerId': r['buyerId'],
+        'travellerId': r['travellerId'],
+        'lastMessage': 'Chat started',
+        'lastSenderId': 'system',
+        'trip_request_id': tripRequestId,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    });
+
+    if (tripCompleted) {
+      await _rejectPendingRequests(r['tripId'], tripRequestId);
+    }
   }
 
   Future<void> rejectTripRequest(String tripRequestId) async {
@@ -778,11 +845,30 @@ class _DashboardBody extends ConsumerWidget {
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                   ),
-                                  onPressed: () => acceptTripRequest(
-                                    context,
-                                    tripRequestId,
-                                    r,
-                                  ),
+                                  onPressed: () async {
+                                    try {
+                                      await acceptTripRequest(tripRequestId, r);
+
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Request accepted'),
+                                        ),
+                                      );
+                                    } catch (e) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(content: Text(e.toString())),
+                                      );
+                                    }
+                                  },
+                                  // onPressed: () => acceptTripRequest(
+                                  //   context,
+                                  //   tripRequestId,
+                                  //   r,
+                                  // ),
                                 ),
                               ),
                             ],

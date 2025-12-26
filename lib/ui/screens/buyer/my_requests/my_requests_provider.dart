@@ -13,3 +13,14 @@ final buyerRequestsProvider =
           .snapshots()
           .map((snapshot) => snapshot.docs);
     });
+
+final requestByIdProvider =
+    StreamProvider.family<DocumentSnapshot<Map<String, dynamic>>, String>((
+      ref,
+      requestId,
+    ) {
+      return FirebaseFirestore.instance
+          .collection('trip_requests')
+          .doc(requestId)
+          .snapshots();
+    });

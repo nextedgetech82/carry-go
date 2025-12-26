@@ -1,4 +1,5 @@
 import 'package:carrygo/ui/screens/buyer/models/fetch_request_model.dart';
+import 'package:carrygo/ui/screens/buyer/request_timeline/request_status.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
@@ -35,6 +36,14 @@ class SendTripRequestController extends StateNotifier<bool> {
 
         final totalPrice = request.weight * pricePerKg;
 
+        // 🔹 Create chat
+        // final chatRef = db.collection('chats').doc();
+        // tx.set(chatRef, {
+        //   'buyerId': request.buyerId,
+        //   'travellerId': tripSnap['travellerId'],
+        //   'createdAt': FieldValue.serverTimestamp(),
+        // });
+
         // 🔹 1️⃣ Create trip_requests entry
         final linkRef = db.collection('trip_requests').doc();
 
@@ -49,13 +58,14 @@ class SendTripRequestController extends StateNotifier<bool> {
           'requestedWeightKg': request.weight,
           'pricePerKg': pricePerKg,
           'totalPrice': totalPrice,
-          'status': 'pending',
+          'status': RequestStatus.requested,
           'createdAt': FieldValue.serverTimestamp(),
         });
 
         // 🔹 2️⃣ Update request status
         tx.update(db.collection('requests').doc(request.id), {
-          'status': 'sent',
+          //'status': 'sent',
+          'status': RequestStatus.requested,
         });
 
         // ❌ DO NOT deduct weight yet

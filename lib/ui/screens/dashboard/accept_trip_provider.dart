@@ -1,3 +1,4 @@
+import 'package:carrygo/ui/screens/buyer/request_timeline/request_status.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -36,3 +37,52 @@ final chatByRequestProvider =
           .doc(requestId)
           .snapshots();
     });
+
+Future<void> updateRequestStatus({
+  required String requestId,
+  required String newStatus,
+  required String chatId,
+}) async {
+  final db = FirebaseFirestore.instance;
+  final trRef = db.collection('trip_requests').doc(requestId);
+
+  final chatSnap = await FirebaseFirestore.instance
+      .collection('chats')
+      .doc(chatId)
+      .get();
+
+  if (!chatSnap.exists) {
+    throw Exception('Chat not found');
+  }
+
+  final chatData = chatSnap.data()!;
+  final reqId = chatData['requestId'] as String;
+  final reqRef = db.collection('requests').doc(reqId);
+
+  await db.runTransaction((tx) async {
+    tx.update(trRef, {
+      'status': RequestStatus.purchased,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+
+    tx.update(reqRef, {
+      'status': RequestStatus.purchased,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+    //final reqRef = db.collection('requests').doc(r['requestId']);
+  });
+  //final uid = FirebaseAuth.instance.currentUser!.uid;
+  // await FirebaseFirestore.instance.collection('requests').doc(requestId).update(
+  //   {'status': 'purchased', 'updatedAt': FieldValue.serverTimestamp()},
+  // );
+
+  // await FirebaseFirestore.instance.collection('requests').doc(requestId).update(
+  //   {
+  //     'status': newStatus,
+  //     'updatedAt': FieldValue.serverTimestamp(),
+  //     'statusHistory': FieldValue.arrayUnion([
+  //       {'status': newStatus, 'by': uid, 'at': Timestamp.now()},
+  //     ]),
+  //   },
+  //);
+}

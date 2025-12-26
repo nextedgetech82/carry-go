@@ -1,3 +1,6 @@
+import 'package:carrygo/ui/screens/buyer/my_requests/my_requests_provider.dart';
+import 'package:carrygo/ui/screens/buyer/request_timeline/request_status.dart';
+import 'package:carrygo/ui/screens/dashboard/accept_trip_provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -6,17 +9,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 class ChatScreen extends ConsumerWidget {
   final String chatId;
   final String otherUserName;
+  final String requestId;
 
   const ChatScreen({
     super.key,
     required this.chatId,
     required this.otherUserName,
+    required this.requestId,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final uid = FirebaseAuth.instance.currentUser!.uid;
     final theme = Theme.of(context);
+
+    final requestAsync = ref.watch(requestByIdProvider(requestId));
+    //final requestAsync = ref.watch(requestByIdProvider(chatId));
 
     final messagesStream = FirebaseFirestore.instance
         .collection('chats')
@@ -64,6 +72,28 @@ class ChatScreen extends ConsumerWidget {
             ),
           ],
         ),
+
+        /// 🔥 ACTION BUTTON IN HEADER
+        actions: [
+          requestAsync.when(
+            loading: () => const SizedBox.shrink(),
+            error: (_, __) => const SizedBox.shrink(),
+            data: (reqSnap) {
+              if (!reqSnap.exists) return const SizedBox.shrink();
+
+              final r = reqSnap.data()!;
+              final status = r['status'] as String;
+              final isTraveller = r['travellerId'] == uid;
+
+              return _ChatStatusAction(
+                requestId: requestId,
+                status: status,
+                isTraveller: isTraveller,
+                chatId: chatId,
+              );
+            },
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -142,6 +172,44 @@ class ChatScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+Widget buildActionBar({
+  required String status,
+  required bool isTraveller,
+  required VoidCallback onPurchased,
+  required VoidCallback onInTransit,
+  required VoidCallback onDelivered,
+  required VoidCallback onCompleted,
+}) {
+  if (isTraveller) {
+    switch (status) {
+      case RequestStatus.accepted:
+        return ElevatedButton(
+          onPressed: onPurchased,
+          child: const Text('Mark Purchased'),
+        );
+      case RequestStatus.purchased:
+        return ElevatedButton(
+          onPressed: onInTransit,
+          child: const Text('Start Journey'),
+        );
+      case RequestStatus.inTransit:
+        return ElevatedButton(
+          onPressed: onDelivered,
+          child: const Text('Mark Delivered'),
+        );
+    }
+  } else {
+    if (status == RequestStatus.delivered) {
+      return ElevatedButton(
+        onPressed: onCompleted,
+        child: const Text('Confirm Delivery'),
+      );
+    }
+  }
+
+  return const SizedBox.shrink();
 }
 
 class _ChatBubble extends StatelessWidget {
@@ -235,6 +303,85 @@ class _ChatBubble extends StatelessWidget {
       return Icon(Icons.done_all, size: 14, color: Colors.grey.shade400);
     }
     return Icon(Icons.done, size: 14, color: Colors.grey.shade400);
+  }
+}
+
+class _ChatStatusAction extends ConsumerWidget {
+  final String requestId;
+  final String status;
+  final String chatId;
+  final bool isTraveller;
+
+  const _ChatStatusAction({
+    required this.requestId,
+    required this.status,
+    required this.isTraveller,
+    required this.chatId,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    Future<void> update(String newStatus) async {
+      await updateRequestStatus(
+        requestId: requestId,
+        newStatus: newStatus,
+        chatId: chatId,
+      );
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Status updated')));
+    }
+
+    if (isTraveller) {
+      switch (status) {
+        case RequestStatus.accepted:
+          return _actionButton(
+            label: 'Mark Purchased',
+            onTap: () => update(RequestStatus.purchased),
+          );
+
+        case RequestStatus.purchased:
+          return _actionButton(
+            label: 'Start Journey',
+            onTap: () => update(RequestStatus.inTransit),
+          );
+
+        case RequestStatus.inTransit:
+          return _actionButton(
+            label: 'Mark Delivered',
+            onTap: () => update(RequestStatus.delivered),
+          );
+      }
+    } else {
+      if (status == RequestStatus.delivered) {
+        return _actionButton(
+          label: 'Confirm Delivery',
+          onTap: () => update(RequestStatus.completed),
+        );
+      }
+    }
+
+    return const SizedBox.shrink();
+  }
+
+  Widget _actionButton({required String label, required VoidCallback onTap}) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 12),
+      child: ElevatedButton(
+        onPressed: onTap,
+        style: ElevatedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+        ),
+      ),
+    );
   }
 }
 

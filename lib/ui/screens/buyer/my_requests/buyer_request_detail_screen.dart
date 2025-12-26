@@ -18,6 +18,11 @@ class BuyerRequestDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    // final requestStream = FirebaseFirestore.instance
+    //     .collection('requests')
+    //     .doc(requestId)
+    //     .snapshots();
+
     final tripRequestStream = FirebaseFirestore.instance
         .collection('trip_requests')
         .where('buyerId', isEqualTo: request['buyerId'])
@@ -48,6 +53,8 @@ class BuyerRequestDetailScreen extends StatelessWidget {
                 if (!snap.hasData || snap.data!.docs.isEmpty) {
                   return _WaitingForTraveller();
                 }
+
+                //final r = snap.data!.data()!;
 
                 final trDoc = snap.data!.docs.first;
                 final tr = trDoc.data() as Map<String, dynamic>;
@@ -267,6 +274,7 @@ class _AcceptedCTA extends StatelessWidget {
                       builder: (_) => ChatScreen(
                         chatId: requestId,
                         otherUserName: traveller['firstName'] ?? 'Traveller',
+                        requestId: requestId,
                       ),
                     ),
                   );
@@ -274,8 +282,11 @@ class _AcceptedCTA extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) =>
-                          ChatScreen(chatId: requestId, otherUserName: name),
+                      builder: (_) => ChatScreen(
+                        chatId: requestId,
+                        otherUserName: name,
+                        requestId: requestId,
+                      ),
                     ),
                   );
                 },
