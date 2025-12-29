@@ -1,3 +1,5 @@
+import 'package:carrygo/core/startup/startup_provider.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -58,6 +60,31 @@ class RoleSelectionController extends StateNotifier<RoleSelectionState> {
       }
 
       state = state.copyWith(loading: false);
+    } catch (e) {
+      state = state.copyWith(loading: false, error: e.toString());
+    }
+  }
+
+  Future<void> submitPhoneRole(WidgetRef ref, BuildContext context) async {
+    try {
+      state = state.copyWith(loading: true);
+
+      final uid = FirebaseAuth.instance.currentUser!.uid;
+
+      await FirebaseFirestore.instance.collection('users').doc(uid).update({
+        'role': state.selectedRole,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      state = state.copyWith(loading: false);
+
+      // 🔁 Restart app state
+      ref.invalidate(startupProvider);
+
+      // 🔥 HARD NAVIGATION RESET → Splash
+      if (context.mounted) {
+        Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+      }
     } catch (e) {
       state = state.copyWith(loading: false, error: e.toString());
     }

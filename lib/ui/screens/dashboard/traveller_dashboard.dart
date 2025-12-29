@@ -5,6 +5,8 @@ import 'package:carrygo/ui/screens/buyer/request_timeline/request_status.dart';
 import 'package:carrygo/ui/screens/chat/chat_screen.dart';
 import 'package:carrygo/ui/screens/chat/traveler_chatstream_provider.dart';
 import 'package:carrygo/ui/screens/dashboard/accept_trip_provider.dart';
+import 'package:carrygo/ui/screens/dashboard/profile.dart';
+import 'package:carrygo/ui/screens/dashboard/traveller_drawer.dart';
 import 'package:carrygo/ui/screens/sender/incoming_requests_provider.dart';
 import 'package:carrygo/ui/screens/trip/add_trip_screen.dart';
 import 'package:carrygo/ui/screens/trip/trip_details_screen.dart';
@@ -12,6 +14,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+
+bool isProfileComplete(Map<String, dynamic> profile) {
+  return (profile['firstName'] != null &&
+      profile['firstName'].toString().isNotEmpty &&
+      profile['lastName'] != null &&
+      profile['lastName'].toString().isNotEmpty);
+}
 
 class TravellerDashboard extends ConsumerWidget {
   const TravellerDashboard({super.key});
@@ -24,84 +33,66 @@ class TravellerDashboard extends ConsumerWidget {
     final profileAsync = ref.watch(userProfileProvider);
     final tripsAsync = ref.watch(myTripsProvider);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Travel Fetcher'),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Logout',
-            onPressed: () async {
-              await FirebaseAuth.instance.signOut();
+    return profileAsync.when(
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
 
-              // 🔥 Reset cached app state
-              ref.invalidate(startupProvider);
-              ref.invalidate(userProfileProvider);
-              ref.invalidate(myTripsProvider);
+      error: (err, _) => Scaffold(body: Center(child: Text('Error: $err'))),
 
-              // 🔁 Restart app flow
-              Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false);
-            },
+      data: (profile) {
+        final fullName =
+            '${profile['firstName'] ?? ''} ${profile['lastName'] ?? ''}'.trim();
+
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('Travel Fetcher'),
+            centerTitle: true,
           ),
-        ],
-      ),
-      body: profileAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => Center(child: Text('Error: $err')),
-        data: (profile) {
-          final fullName =
-              '${profile['firstName'] ?? ''} ${profile['lastName'] ?? ''}';
-          //profileFullName = fullName;
 
-          return DefaultTabController(
+          /// ✅ NOW profile IS AVAILABLE
+          drawer: TravellerDrawer(profile: profile),
+
+          body: DefaultTabController(
             length: 2,
             child: Column(
               children: [
-                /// 🔹 TAB BAR
-                Container(
-                  color: theme.scaffoldBackgroundColor,
-                  child: TabBar(
-                    labelColor: theme.colorScheme.primary,
-                    unselectedLabelColor: Colors.grey,
-                    indicatorColor: theme.colorScheme.primary,
-                    tabs: const [
-                      Tab(icon: Icon(Icons.dashboard), text: 'Dashboard'),
-                      //Tab(icon: Icon(Icons.inbox), text: 'Requests'),
-                      Tab(icon: Icon(Icons.chat), text: 'Chats'),
-                    ],
-                  ),
+                TabBar(
+                  labelColor: theme.colorScheme.primary,
+                  tabs: const [
+                    Tab(icon: Icon(Icons.dashboard), text: 'Dashboard'),
+                    Tab(icon: Icon(Icons.chat), text: 'Chats'),
+                  ],
                 ),
-
-                /// 🔹 TAB CONTENT
                 Expanded(
                   child: TabBarView(
                     children: [
-                      /// 1️⃣ Dashboard
                       _DashboardBody(
                         theme: theme,
-                        fullName: fullName.trim(),
+                        fullName: fullName,
                         tripsAsync: tripsAsync,
+                        profile: profile,
                       ),
-                      // TravellerDashboardTab(
-                      //   theme: theme,
-                      //   fullName: fullName.trim(),
-                      //   tripsAsync: tripsAsync,
-                      // ),
-
-                      /// 2️⃣ Incoming Requests
-                      //IncomingRequestsTab(theme: theme),
-
-                      /// 3️⃣ Accepted Requests (Chats)
                       AcceptedRequestsTab(theme: theme),
                     ],
                   ),
                 ),
               ],
             ),
-          );
-        },
-      ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class SettingsScreen extends StatelessWidget {
+  const SettingsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Settings')),
+      body: const Center(child: Text('Settings coming soon')),
     );
   }
 }
@@ -521,15 +512,52 @@ class _AcceptedRequestCard extends ConsumerWidget {
   }
 }
 
+class _CompleteProfileBanner extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.orange.shade50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.orange),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.warning_amber, color: Colors.orange),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              'Complete your profile to start posting trips.',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ProfileScreen()),
+              );
+            },
+            child: const Text('Complete Now'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _DashboardBody extends ConsumerWidget {
   final ThemeData theme;
   final String fullName;
   final AsyncValue tripsAsync;
+  final Map<String, dynamic> profile;
 
   const _DashboardBody({
     required this.theme,
     required this.fullName,
     required this.tripsAsync,
+    required this.profile,
   });
 
   Future<void> acceptTripRequest2(
@@ -718,6 +746,7 @@ class _DashboardBody extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final requestsAsync = ref.watch(incomingTripRequestsProvider);
+    final profileComplete = isProfileComplete(profile);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -728,6 +757,11 @@ class _DashboardBody extends ConsumerWidget {
           _Header(theme: theme, fullName: fullName),
 
           const SizedBox(height: 24),
+
+          if (!profileComplete) ...[
+            _CompleteProfileBanner(),
+            const SizedBox(height: 24),
+          ],
 
           /// 🔹 Stats
           Row(
@@ -749,18 +783,30 @@ class _DashboardBody extends ConsumerWidget {
             width: double.infinity,
             height: 56,
             child: ElevatedButton.icon(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const AddTripScreen()),
-                );
-              },
+              onPressed: profileComplete
+                  ? () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const AddTripScreen(),
+                        ),
+                      );
+                    }
+                  : () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Please complete your profile first'),
+                        ),
+                      );
+                    },
               icon: const Icon(Icons.add),
-              label: const Text(
-                'Post a New Trip',
-                style: TextStyle(fontSize: 16),
+              label: Text(
+                profileComplete
+                    ? 'Post a New Trip'
+                    : 'Complete Profile to Post Trip',
               ),
               style: ElevatedButton.styleFrom(
+                backgroundColor: profileComplete ? null : Colors.grey.shade400,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
@@ -1047,11 +1093,27 @@ class _Header extends StatelessWidget {
     return Row(
       children: [
         Expanded(
-          child: Text(
-            'Welcome back, $fullName 👋',
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Welcome back 👋',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.hintColor,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                fullName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
           ),
         ),
         Container(

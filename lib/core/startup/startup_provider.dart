@@ -25,9 +25,9 @@ final startupProvider = FutureProvider<StartupResult>((ref) async {
   await user.reload();
 
   // 3️⃣ Email verification
-  if (!user.emailVerified) {
-    return StartupResult.emailVerification;
-  }
+  // if (!user.emailVerified) {
+  //   return StartupResult.emailVerification;
+  // }
 
   // 4️⃣ Firestore user
   final doc = await FirebaseFirestore.instance

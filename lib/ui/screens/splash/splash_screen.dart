@@ -1,8 +1,9 @@
-import 'package:carrygo/core/auth/phone_otp_screen.dart';
 import 'package:carrygo/ui/screens/buyer/dashboard/buyer_dashboard_screen.dart';
 import 'package:carrygo/ui/screens/sender/sender_dashboard.dart';
 import 'package:carrygo/ui/screens/signin/signin_screen.dart';
+import 'package:carrygo/ui/screens/signup/phone_number_screen.dart';
 import 'package:carrygo/ui/screens/signup/phone_otp_screen.dart';
+import 'package:carrygo/ui/screens/signup/role_selection_new.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -44,7 +45,9 @@ class SplashScreen extends ConsumerWidget {
         page = const OnboardingScreen();
         break;
       case StartupResult.signin:
-        page = const SigninScreen();
+        page = const PhoneNumberScreen();
+
+        //page = const SigninScreen();
         break;
       case StartupResult.signup:
         //page = const SignupScreen();
@@ -55,7 +58,8 @@ class SplashScreen extends ConsumerWidget {
         page = const EmailVerificationScreen();
         break;
       case StartupResult.phoneVerification:
-        page = const PhoneOtpScreen();
+        page = const PhoneNumberScreen();
+        //page = const PhoneOtpScreen();
         break;
       case StartupResult.travellerDashboard:
         page = const TravellerDashboard();
@@ -67,7 +71,8 @@ class SplashScreen extends ConsumerWidget {
 
       case StartupResult.roleSelection:
         // role missing, redirect to signup or role selection flow
-        page = const SignupScreen();
+        //page = const SignupScreen();
+        page = const RoleSelectionScreenNew();
         break;
     }
 

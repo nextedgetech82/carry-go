@@ -1,3 +1,4 @@
+import 'package:carrygo/ui/screens/signup/phone_number_screen.dart';
 import 'package:flutter/material.dart';
 
 import '../../../services/app_startup_service.dart';
@@ -38,9 +39,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     await AppStartupService.setOnboardingDone();
     if (!mounted) return;
 
-    Navigator.of(
-      context,
-    ).pushReplacement(MaterialPageRoute(builder: (_) => const SigninScreen()));
+    // Navigator.of(
+    //   context,
+    // ).pushReplacement(MaterialPageRoute(builder: (_) => const SigninScreen()));
+
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const PhoneNumberScreen()),
+    );
   }
 
   @override
