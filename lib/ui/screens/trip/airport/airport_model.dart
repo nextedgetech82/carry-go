@@ -19,4 +19,13 @@ class Airport {
       country: j['country'],
     );
   }
+
+  factory Airport.fromFirestore(Map<String, dynamic> d) {
+    return Airport(
+      city: d['city'],
+      airport: d['name'],
+      code: d['iata'],
+      country: d['country'],
+    );
+  }
 }

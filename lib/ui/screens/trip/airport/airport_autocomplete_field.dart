@@ -1,6 +1,6 @@
+import 'package:carrygo/ui/screens/trip/airport/airport_repository.dart';
 import 'package:flutter/material.dart';
 import 'airport_model.dart';
-import 'airport.dart';
 
 Widget airportField({
   required TextEditingController controller,
@@ -11,19 +11,13 @@ Widget airportField({
   return Autocomplete<Airport>(
     displayStringForOption: (a) => '${a.city} (${a.code})',
 
-    /// 🔍 SEARCH FROM airport.dart LIST
+    /// 🔍 NOW SEARCHES LOCAL + FIREBASE CACHE
     optionsBuilder: (TextEditingValue text) {
       final query = text.text.trim().toLowerCase();
       if (query.length < 2) {
         return const Iterable<Airport>.empty();
       }
-
-      return airports.where(
-        (a) =>
-            a.city.toLowerCase().startsWith(query) ||
-            a.code.toLowerCase().startsWith(query) ||
-            a.airport.toLowerCase().contains(query),
-      );
+      return AirportRepo.search(query).take(15);
     },
 
     onSelected: (airport) {
@@ -31,7 +25,6 @@ Widget airportField({
       onSelected(airport);
     },
 
-    /// ✏️ INPUT FIELD
     fieldViewBuilder: (context, textCtrl, focusNode, _) {
       return TextFormField(
         controller: textCtrl,
@@ -45,7 +38,6 @@ Widget airportField({
       );
     },
 
-    /// 📋 DROPDOWN LIST
     optionsViewBuilder: (context, onSelected, options) {
       return Material(
         elevation: 8,

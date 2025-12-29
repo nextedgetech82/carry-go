@@ -1,3 +1,8 @@
+import 'package:carrygo/ui/screens/trip/airport/airport_autocomplete_field.dart';
+import 'package:carrygo/ui/screens/trip/airport/airport_field.dart'
+    hide airportField;
+import 'package:carrygo/ui/screens/trip/airport/airport_model.dart';
+import 'package:carrygo/ui/screens/trip/airport/airport_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'add_trip_controller.dart';
@@ -12,14 +17,27 @@ class AddTripScreen extends ConsumerStatefulWidget {
 class _AddTripScreenState extends ConsumerState<AddTripScreen> {
   final _formKey = GlobalKey<FormState>();
 
+  Airport? fromAirport;
+  Airport? toAirport;
+
   final fromCtrl = TextEditingController();
   final toCtrl = TextEditingController();
   final weightCtrl = TextEditingController();
   final priceCtrl = TextEditingController();
   final notesCtrl = TextEditingController();
 
+  /// ✅ DECLARE THESE
+  Map<String, dynamic>? selectedFromAirport;
+  Map<String, dynamic>? selectedToAirport;
+
   DateTime? departureDate;
   DateTime? arrivalDate;
+
+  @override
+  void initState() {
+    super.initState();
+    AirportRepo.loadFromFirebase(); // 🔥 one-time load
+  }
 
   @override
   void dispose() {
@@ -112,26 +130,40 @@ class _AddTripScreenState extends ConsumerState<AddTripScreen> {
                     key: _formKey,
                     child: Column(
                       children: [
-                        TextFormField(
+                        airportField(
                           controller: fromCtrl,
-                          decoration: const InputDecoration(
-                            labelText: 'From City',
-                            prefixIcon: Icon(Icons.flight_takeoff),
-                          ),
-                          validator: (v) => v!.isEmpty ? 'Required' : null,
+                          label: 'From Airport',
+                          icon: Icons.flight_takeoff,
+                          onSelected: (a) => fromAirport = a,
                         ),
-
                         const SizedBox(height: 16),
 
-                        TextFormField(
+                        airportField(
                           controller: toCtrl,
-                          decoration: const InputDecoration(
-                            labelText: 'To City',
-                            prefixIcon: Icon(Icons.flight_land),
-                          ),
-                          validator: (v) => v!.isEmpty ? 'Required' : null,
+                          label: 'TO Airport',
+                          icon: Icons.flight_land,
+                          onSelected: (a) => toAirport = a,
                         ),
+                        // AirportAutocompleteField(
+                        //   controller: fromCtrl,
+                        //   label: 'From Airport',
+                        //   icon: Icons.flight_takeoff,
+                        //   onSelected: (airport) {
+                        //     selectedFromAirport =
+                        //         airport; // store full object if needed
+                        //   },
+                        // ),
 
+                        // const SizedBox(height: 16),
+
+                        // AirportAutocompleteField(
+                        //   controller: toCtrl,
+                        //   label: 'To Airport',
+                        //   icon: Icons.flight_land,
+                        //   onSelected: (airport) {
+                        //     selectedToAirport = airport;
+                        //   },
+                        // ),
                         const SizedBox(height: 20),
 
                         /// 🔹 Dates

@@ -30,6 +30,9 @@ class _PostRequestScreenState extends ConsumerState<PostRequestScreen> {
   final _qty = TextEditingController();
   final _budget = TextEditingController();
 
+  Airport? fromAirport;
+  Airport? toAirport;
+
   DateTime? _deadline;
 
   @override
@@ -80,12 +83,25 @@ class _PostRequestScreenState extends ConsumerState<PostRequestScreen> {
                 //   label: 'To Airport',
                 //   icon: Icons.flight_land_outlined,
                 // ),
-                _field(
-                  _fromCity,
-                  'From City',
-                  icon: Icons.flight_takeoff_outlined,
+                airportField(
+                  controller: _fromCity,
+                  label: 'From Airport',
+                  icon: Icons.flight_takeoff,
+                  onSelected: (a) => fromAirport = a,
                 ),
-                _field(_toCity, 'To City', icon: Icons.flight_land_outlined),
+                const SizedBox(height: 16),
+                airportField(
+                  controller: _toCity,
+                  label: 'TO Airport',
+                  icon: Icons.flight_land,
+                  onSelected: (a) => toAirport = a,
+                ),
+                // _field(
+                //   _fromCity,
+                //   'From City',
+                //   icon: Icons.flight_takeoff_outlined,
+                // ),
+                //_field(_toCity, 'To City', icon: Icons.flight_land_outlined),
               ],
             ),
 

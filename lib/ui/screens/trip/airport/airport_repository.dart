@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'package:carrygo/ui/screens/trip/airport/airport.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/services.dart';
 import 'airport_model.dart';
 
@@ -32,5 +34,35 @@ class AirportRepository {
         )
         .take(15)
         .toList();
+  }
+}
+
+class AirportRepo {
+  static final List<Airport> _cache = [...airports];
+  static bool _firebaseLoaded = false;
+
+  /// 🔥 Load Firebase airports ONCE
+  static Future<void> loadFromFirebase() async {
+    if (_firebaseLoaded) return;
+
+    final snap = await FirebaseFirestore.instance.collection('airports').get();
+
+    for (final d in snap.docs) {
+      _cache.add(Airport.fromFirestore(d.data()));
+    }
+
+    _firebaseLoaded = true;
+  }
+
+  /// 🔍 Search (sync)
+  static Iterable<Airport> search(String query) {
+    final q = query.toLowerCase();
+
+    return _cache.where(
+      (a) =>
+          a.city.toLowerCase().startsWith(q) ||
+          a.code.toLowerCase().startsWith(q) ||
+          a.airport.toLowerCase().contains(q),
+    );
   }
 }
