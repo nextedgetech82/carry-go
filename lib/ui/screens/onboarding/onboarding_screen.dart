@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../services/app_startup_service.dart';
-import '../signup/signup_screen.dart';
+import '../signin/signin_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -40,7 +40,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
     Navigator.of(
       context,
-    ).pushReplacement(MaterialPageRoute(builder: (_) => const SignupScreen()));
+    ).pushReplacement(MaterialPageRoute(builder: (_) => const SigninScreen()));
   }
 
   @override
