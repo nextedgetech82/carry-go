@@ -10,6 +10,7 @@ import 'package:carrygo/ui/screens/dashboard/traveller_drawer.dart';
 import 'package:carrygo/ui/screens/sender/incoming_requests_provider.dart';
 import 'package:carrygo/ui/screens/trip/add_trip_screen.dart';
 import 'package:carrygo/ui/screens/trip/trip_details_screen.dart';
+import 'package:carrygo/widgets/role_badge.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -42,10 +43,18 @@ class TravellerDashboard extends ConsumerWidget {
       data: (profile) {
         final fullName =
             '${profile['firstName'] ?? ''} ${profile['lastName'] ?? ''}'.trim();
+        final role = profile['role'] ?? 'traveller';
 
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Travel Fetcher'),
+            title: Row(
+              children: [
+                const SizedBox(width: 16),
+                const Text('Travel Fetcher'),
+                const SizedBox(width: 10),
+                RoleBadge(role: role),
+              ],
+            ),
             centerTitle: true,
           ),
 

@@ -2,8 +2,11 @@ import 'package:carrygo/core/startup/startup_provider.dart';
 import 'package:carrygo/providers/my_trips_provider.dart';
 import 'package:carrygo/providers/user_profile_provider.dart';
 import 'package:carrygo/ui/screens/dashboard/profile.dart';
+import 'package:carrygo/widgets/role_badge.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class TravellerDrawer extends ConsumerWidget {
@@ -16,6 +19,154 @@ class TravellerDrawer extends ConsumerWidget {
         (profile['lastName'] ?? '').toString().trim().isNotEmpty;
   }
 
+  Future<void> _confirmSwitchRole(BuildContext context, WidgetRef ref) async {
+    final currentRole = profile['role'];
+    final newRole = currentRole == 'traveller' ? 'buyer' : 'traveller';
+
+    final ok = await showGeneralDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Switch Role',
+      barrierColor: Colors.black.withOpacity(0.4),
+      transitionDuration: const Duration(milliseconds: 260),
+      pageBuilder: (_, __, ___) {
+        return Center(
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              width: MediaQuery.of(context).size.width * 0.85,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(22),
+                color: Theme.of(context).cardColor,
+                boxShadow: [
+                  BoxShadow(
+                    blurRadius: 30,
+                    color: Colors.black.withOpacity(0.25),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  /// 🌈 GRADIENT ICON
+                  Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        colors: newRole == 'traveller'
+                            ? [Colors.blue, Colors.indigo]
+                            : [Colors.orange, Colors.deepOrange],
+                      ),
+                    ),
+                    child: Icon(
+                      roleIcon(newRole),
+                      color: Colors.white,
+                      size: 36,
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  /// 🧠 TITLE
+                  Text(
+                    'Switch to ${newRole[0].toUpperCase()}${newRole.substring(1)}',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  /// 💬 DESCRIPTION
+                  Text(
+                    newRole == 'traveller'
+                        ? 'Post trips and earn by carrying items for others.'
+                        : 'Send items safely using verified travellers.',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).hintColor,
+                    ),
+                  ),
+
+                  const SizedBox(height: 22),
+
+                  /// 🔘 ACTIONS
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          onPressed: () => Navigator.pop(context, false),
+                          child: const Text('Cancel'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            elevation: 4,
+                          ),
+                          onPressed: () => Navigator.pop(context, true),
+                          child: const Text(
+                            'Switch Role',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+      transitionBuilder: (_, animation, __, child) {
+        final curved = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutBack,
+        );
+        return ScaleTransition(scale: curved, child: child);
+      },
+    );
+
+    if (ok == true) {
+      /// 📳 HAPTIC CONFIRMATION
+      HapticFeedback.mediumImpact();
+
+      await _switchRole(context, ref);
+    }
+  }
+
+  Future<void> _switchRole(BuildContext context, WidgetRef ref) async {
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+    final currentRole = profile['role'];
+
+    final newRole = currentRole == 'traveller' ? 'sender' : 'traveller';
+
+    await FirebaseFirestore.instance.collection('users').doc(uid).update({
+      'role': newRole,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+
+    // 🔥 Clear cached state
+    ref.invalidate(startupProvider);
+    ref.invalidate(userProfileProvider);
+
+    // 🔁 Restart flow
+    Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false);
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
@@ -26,7 +177,7 @@ class TravellerDrawer extends ConsumerWidget {
     final displayName = fullName.isEmpty ? 'Traveller' : fullName;
     final phone = profile['phone'] ?? '';
     final complete = _isProfileComplete();
-
+    final activeRole = profile['role'];
     final initials = displayName
         .split(' ')
         .map((e) => e.isNotEmpty ? e[0] : '')
@@ -91,7 +242,9 @@ class TravellerDrawer extends ConsumerWidget {
                           fontSize: 16,
                         ),
                       ),
+
                       const SizedBox(height: 4),
+
                       Text(
                         phone,
                         maxLines: 1,
@@ -99,6 +252,31 @@ class TravellerDrawer extends ConsumerWidget {
                         style: TextStyle(
                           color: Colors.white.withOpacity(0.85),
                           fontSize: 12,
+                        ),
+                      ),
+
+                      const SizedBox(height: 6),
+
+                      /// 🔖 ACTIVE ROLE BADGE
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.18),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          activeRole.toUpperCase() == 'SENDER'
+                              ? 'Buyer'
+                              : 'Traveller',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.8,
+                          ),
                         ),
                       ),
                     ],
@@ -134,13 +312,13 @@ class TravellerDrawer extends ConsumerWidget {
 
           // 🔧 SETTINGS (FUTURE)
           _DrawerItem(
-            icon: Icons.settings_outlined,
-            title: 'Settings',
+            icon: Icons.swap_horiz,
+            title: activeRole == 'traveller'
+                ? 'Switch to Buyer'
+                : 'Switch to Traveller',
             onTap: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Settings coming soon')),
-              );
+              //Navigator.pop(context);
+              _confirmSwitchRole(context, ref);
             },
           ),
 

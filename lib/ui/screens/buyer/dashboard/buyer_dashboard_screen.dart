@@ -3,6 +3,7 @@ import 'package:carrygo/providers/user_profile_provider.dart';
 import 'package:carrygo/ui/screens/buyer/dashboard/buyer_drawer.dart';
 import 'package:carrygo/ui/screens/buyer/matching/buyer_trip_filter_provider.dart';
 import 'package:carrygo/ui/screens/buyer/requests/active_buyer_request_provider.dart';
+import 'package:carrygo/widgets/role_badge.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -22,13 +23,21 @@ class BuyerDashboardScreen extends ConsumerWidget {
           const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (e, _) => Scaffold(body: Center(child: Text(e.toString()))),
       data: (profile) {
+        final role = profile['role'] ?? 'buyer';
         return DefaultTabController(
           length: 3,
           child: Scaffold(
             drawer: BuyerDrawer(profile: profile), // ✅ ADD HERE
 
             appBar: AppBar(
-              title: const Text('Buyer Dashboard'),
+              title: Row(
+                children: [
+                  const SizedBox(width: 16),
+                  const Text('Travel Fetcher'),
+                  const SizedBox(width: 10),
+                  RoleBadge(role: role),
+                ],
+              ),
               centerTitle: true,
               bottom: const TabBar(
                 tabs: [
