@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -7,6 +8,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
 
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -27,10 +31,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   late TextEditingController phoneCtrl;
   late TextEditingController emailCtrl;
 
+  late TextEditingController address1Ctrl;
+  late TextEditingController address2Ctrl;
+  late TextEditingController cityCtrl;
+  late TextEditingController stateCtrl;
+  late TextEditingController countryCtrl;
+  late TextEditingController pincodeCtrl;
+
   File? _selectedImage;
   String? _photoUrl;
   double _uploadProgress = 0.0;
   bool _uploadingPhoto = false;
+  bool _pincodeLoading = false;
+  bool _locationLoading = false;
 
   bool loading = false;
 
@@ -111,6 +124,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     lastNameCtrl = TextEditingController(text: profile['lastName'] ?? '');
     phoneCtrl = TextEditingController(text: profile['phone'] ?? '');
     emailCtrl = TextEditingController(text: profile['email'] ?? '');
+
+    final address = profile['address'] ?? {};
+
+    address1Ctrl = TextEditingController(text: address['line1'] ?? '');
+    address2Ctrl = TextEditingController(text: address['line2'] ?? '');
+    cityCtrl = TextEditingController(text: address['city'] ?? '');
+    stateCtrl = TextEditingController(text: address['state'] ?? '');
+    countryCtrl = TextEditingController(text: address['country'] ?? '');
+    pincodeCtrl = TextEditingController(text: address['pincode'] ?? '');
   }
 
   @override
@@ -119,6 +141,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     lastNameCtrl.dispose();
     phoneCtrl.dispose();
     emailCtrl.dispose();
+
+    address1Ctrl.dispose();
+    address2Ctrl.dispose();
+    cityCtrl.dispose();
+    stateCtrl.dispose();
+    countryCtrl.dispose();
+    pincodeCtrl.dispose();
+
     super.dispose();
   }
 
@@ -261,6 +291,130 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     return await snapshot.ref.getDownloadURL();
   }
 
+  Future<void> _fetchAddressFromGPS() async {
+    try {
+      setState(() => _locationLoading = true);
+
+      // 1️⃣ Check service
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        throw 'Location services are disabled';
+      }
+
+      // 2️⃣ Permission
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        throw 'Location permission permanently denied';
+      }
+
+      // 3️⃣ Get position
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      // 4️⃣ Reverse geocode
+      final placemarks = await placemarkFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+
+      if (placemarks.isEmpty) return;
+
+      final place = placemarks.first;
+
+      setState(() {
+        address1Ctrl.text = '${place.street ?? ''}, ${place.subLocality ?? ''}'
+            .trim();
+
+        cityCtrl.text = place.locality ?? '';
+        stateCtrl.text = place.administrativeArea ?? '';
+        countryCtrl.text = place.country ?? 'India';
+        pincodeCtrl.text = place.postalCode ?? '';
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally {
+      setState(() => _locationLoading = false);
+    }
+  }
+
+  Future<void> _fetchCityStateFromPincode(String pincode) async {
+    if (pincode.length != 6) return;
+
+    setState(() => _pincodeLoading = true);
+
+    try {
+      final res = await http.get(
+        Uri.parse('https://api.postalpincode.in/pincode/$pincode'),
+      );
+
+      final data = jsonDecode(res.body);
+
+      if (data is List && data.isNotEmpty && data[0]['Status'] == 'Success') {
+        final postOffice = data[0]['PostOffice'][0];
+
+        setState(() {
+          cityCtrl.text = postOffice['District'] ?? '';
+          stateCtrl.text = postOffice['State'] ?? '';
+          countryCtrl.text = 'India';
+        });
+      }
+    } catch (_) {
+      // silent fail (don’t disturb user)
+    } finally {
+      if (mounted) {
+        setState(() => _pincodeLoading = false);
+      }
+    }
+  }
+
+  void _showSaveSuccess(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isDismissible: false,
+      enableDrag: false,
+      backgroundColor: Colors.transparent,
+      builder: (_) {
+        Future.delayed(const Duration(milliseconds: 1500), () {
+          if (Navigator.canPop(context)) Navigator.pop(context);
+        });
+
+        return Container(
+          margin: const EdgeInsets.all(16),
+          padding: const EdgeInsets.symmetric(vertical: 24),
+          decoration: BoxDecoration(
+            color: Colors.green.shade600,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(color: Colors.green.withOpacity(0.35), blurRadius: 16),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.check_circle, color: Colors.white, size: 48),
+              const SizedBox(height: 12),
+              const Text(
+                'Saved successfully',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.2,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -274,14 +428,27 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       'firstName': firstNameCtrl.text.trim(),
       'lastName': lastNameCtrl.text.trim(),
       'photoUrl': photoUrl,
+      'address': {
+        'line1': address1Ctrl.text.trim(),
+        'line2': address2Ctrl.text.trim(),
+        'city': cityCtrl.text.trim(),
+        'state': stateCtrl.text.trim(),
+        'country': countryCtrl.text.trim(),
+        'pincode': pincodeCtrl.text.trim(),
+      },
       'updatedAt': FieldValue.serverTimestamp(),
     });
 
     ref.invalidate(userProfileProvider);
 
-    if (mounted) {
-      Navigator.pop(context);
-    }
+    _showSaveSuccess(context);
+    Future.delayed(const Duration(milliseconds: 1600), () {
+      if (mounted) Navigator.pop(context);
+    });
+
+    // if (mounted) {
+    //   Navigator.pop(context);
+    //}
   }
 
   @override
@@ -290,12 +457,43 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('My Profile')),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 12,
+              offset: const Offset(0, -4),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: SizedBox(
+              height: 52,
+              child: ElevatedButton(
+                onPressed: (loading || _uploadingPhoto) ? null : _save,
+                child: loading || _uploadingPhoto
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const Text(
+                        'Save Changes',
+                        style: TextStyle(fontSize: 16),
+                      ),
+              ),
+            ),
+          ),
+        ),
+      ),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Form(
-            key: _formKey,
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 /// 🖼 PROFILE PHOTO
                 GestureDetector(
@@ -462,22 +660,145 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   textAlign: TextAlign.center,
                 ),
 
-                const Spacer(),
+                const SizedBox(height: 28),
 
-                /// 💾 Save Button
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: ElevatedButton(
-                    onPressed: (loading || _uploadingPhoto) ? null : _save,
-                    child: loading || _uploadingPhoto
-                        ? const CircularProgressIndicator(color: Colors.white)
-                        : const Text(
-                            'Save Changes',
-                            style: TextStyle(fontSize: 16),
-                          ),
+                /// 📍 ADDRESS SECTION
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Address Details',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
+
+                const SizedBox(height: 12),
+
+                TextFormField(
+                  controller: address1Ctrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Address Line 1',
+                    prefixIcon: Icon(Icons.home_outlined),
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                TextFormField(
+                  controller: address2Ctrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Address Line 2 (Optional)',
+                    prefixIcon: Icon(Icons.location_on_outlined),
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    icon: _locationLoading
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.my_location),
+                    label: const Text('Use Current Location'),
+                    onPressed: _locationLoading ? null : _fetchAddressFromGPS,
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                TextFormField(
+                  controller: pincodeCtrl,
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
+                  decoration: InputDecoration(
+                    labelText: 'Pincode',
+                    prefixIcon: const Icon(Icons.markunread_mailbox_outlined),
+                    suffixIcon: _pincodeLoading
+                        ? const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          )
+                        : null,
+                  ),
+                  onChanged: (val) {
+                    if (val.length == 6) {
+                      _fetchCityStateFromPincode(val);
+                      FocusScope.of(context).unfocus();
+                    }
+                  },
+                ),
+                const SizedBox(height: 12),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: cityCtrl,
+                        enabled: true, // 🔒 auto-filled
+                        decoration: const InputDecoration(
+                          labelText: 'City',
+                          prefixIcon: Icon(Icons.location_city),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextFormField(
+                        controller: stateCtrl,
+                        enabled: true, // 🔒 auto-filled
+                        decoration: const InputDecoration(
+                          labelText: 'State',
+                          prefixIcon: Icon(Icons.map_outlined),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                TextFormField(
+                  controller: countryCtrl,
+                  enabled: true, // 🔒 auto-filled
+                  decoration: const InputDecoration(
+                    labelText: 'Country',
+                    prefixIcon: Icon(Icons.public),
+                  ),
+                ),
+
+                //const Spacer(),
+                // const SizedBox(height: 32),
+
+                // /// 💾 Save Button
+                // SizedBox(
+                //   width: double.infinity,
+                //   height: 52,
+                //   child: ElevatedButton(
+                //     onPressed: (loading || _uploadingPhoto) ? null : _save,
+                //     child: loading || _uploadingPhoto
+                //         ? const CircularProgressIndicator(color: Colors.white)
+                //         : const Text(
+                //             'Save Changes',
+                //             style: TextStyle(fontSize: 16),
+                //           ),
+                //   ),
+                // ),
+
+                // const SizedBox(height: 24),
               ],
             ),
           ),
