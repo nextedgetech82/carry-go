@@ -25,6 +25,8 @@ class ChatScreen extends ConsumerWidget {
     final theme = Theme.of(context);
 
     final requestAsync = ref.watch(requestByIdProvider(requestId));
+    // final otherUserProfileAsync =
+    // ref.watch(userProfileByIdProvider(otherUserId));
 
     //final otherUserIdAsync = ref.watch(chatOtherUserIdProvider(chatId));
 

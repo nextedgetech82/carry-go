@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:carrygo/core/startup/startup_provider.dart';
 import 'package:carrygo/providers/user_profile_provider.dart';
 import 'package:carrygo/ui/screens/dashboard/profile.dart';
@@ -213,16 +214,44 @@ class BuyerDrawer extends ConsumerWidget {
                     shape: BoxShape.circle,
                     border: Border.all(color: Colors.white, width: 2),
                   ),
-                  child: CircleAvatar(
-                    radius: 28,
-                    backgroundColor: Colors.white,
-                    child: Text(
-                      initials,
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.primary,
-                      ),
+                  child: ClipOval(
+                    child: SizedBox(
+                      width: 56,
+                      height: 56,
+                      child:
+                          (profile['photoUrl'] != null &&
+                              profile['photoUrl'].toString().isNotEmpty)
+                          ? CachedNetworkImage(
+                              imageUrl: profile['photoUrl'],
+                              fit: BoxFit.cover,
+                              fadeInDuration: const Duration(milliseconds: 250),
+
+                              /// 🔄 LOADING STATE
+                              placeholder: (context, url) => Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  _DrawerInitials(
+                                    initials: initials,
+                                    theme: theme,
+                                  ),
+                                  const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+
+                              /// ❌ ERROR FALLBACK
+                              errorWidget: (_, __, ___) => _DrawerInitials(
+                                initials: initials,
+                                theme: theme,
+                              ),
+                            )
+                          : _DrawerInitials(initials: initials, theme: theme),
                     ),
                   ),
                 ),
@@ -371,6 +400,29 @@ class _DrawerItem extends StatelessWidget {
         ),
       ),
       onTap: onTap,
+    );
+  }
+}
+
+class _DrawerInitials extends StatelessWidget {
+  final String initials;
+  final ThemeData theme;
+
+  const _DrawerInitials({required this.initials, required this.theme});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: Colors.white,
+      alignment: Alignment.center,
+      child: Text(
+        initials.isEmpty ? '?' : initials,
+        style: TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+          color: theme.colorScheme.primary,
+        ),
+      ),
     );
   }
 }

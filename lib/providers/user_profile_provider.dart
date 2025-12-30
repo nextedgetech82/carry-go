@@ -15,3 +15,12 @@ final userProfileProvider = StreamProvider<Map<String, dynamic>>((ref) {
       .snapshots()
       .map((doc) => doc.data() ?? {});
 });
+
+final userProfileByIdProvider =
+    StreamProvider.family<Map<String, dynamic>, String>((ref, uid) {
+      return FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .snapshots()
+          .map((doc) => doc.data() ?? {});
+    });
