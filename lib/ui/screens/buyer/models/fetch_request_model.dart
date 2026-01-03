@@ -11,6 +11,9 @@ class FetchRequestModel {
   final double budget;
   final DateTime deadline;
   final String status;
+  final String tripId;
+  final String tripRequestId;
+  final String travellerId;
 
   FetchRequestModel({
     required this.id,
@@ -23,6 +26,9 @@ class FetchRequestModel {
     required this.budget,
     required this.deadline,
     required this.status,
+    required this.tripId,
+    required this.tripRequestId,
+    required this.travellerId,
   });
 
   Map<String, dynamic> toMap() {
@@ -36,6 +42,9 @@ class FetchRequestModel {
       'budget': budget,
       'deadline': deadline,
       'status': status,
+      'tripId': tripId,
+      'tripRequestId': tripRequestId,
+      'travellerId': travellerId,
       'createdAt': FieldValue.serverTimestamp(),
     };
   }
@@ -55,6 +64,9 @@ class FetchRequestModel {
       budget: (d['budget'] ?? 0).toDouble(),
       deadline: (d['deadline'] as Timestamp).toDate(),
       status: d['status'],
+      tripId: d['tripId'],
+      tripRequestId: d['tripRequestId'],
+      travellerId: d['travellerId'],
     );
   }
 }

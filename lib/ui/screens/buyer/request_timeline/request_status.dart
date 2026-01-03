@@ -6,4 +6,8 @@ class RequestStatus {
   static const delivered = 'delivered';
   static const completed = 'completed';
   static const cancelled = 'cancelled';
+
+  // 🔥 NEW
+  static const disputed = 'disputed';
+  static const refunded = 'refunded';
 }

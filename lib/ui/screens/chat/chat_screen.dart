@@ -1,11 +1,15 @@
+import 'dart:convert';
+
 import 'package:carrygo/ui/screens/buyer/my_requests/my_requests_provider.dart';
 import 'package:carrygo/ui/screens/buyer/request_timeline/request_status.dart';
 import 'package:carrygo/ui/screens/chat/traveler_chatstream_provider.dart';
 import 'package:carrygo/ui/screens/dashboard/accept_trip_provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
 
 class ChatScreen extends ConsumerWidget {
   final String chatId;
@@ -391,16 +395,57 @@ class _ChatStatusAction extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    Future<void> update(String newStatus) async {
-      await updateRequestStatus(
-        requestId: requestId,
-        newStatus: newStatus,
-        chatId: chatId,
+    // Future<void> update(String newStatus) async {
+    //   await updateRequestStatus(
+    //     requestId: requestId,
+    //     newStatus: newStatus,
+    //     chatId: chatId,
+    //   );
+
+    //   ScaffoldMessenger.of(
+    //     context,
+    //   ).showSnackBar(SnackBar(content: Text('Status updated')));
+    // }
+    Future<void> update2(String newStatus) async {
+      final functions = FirebaseFunctions.instanceFor(region: 'us-central1');
+      print(
+        FirebaseFunctions.instance.httpsCallable('updateTransactionStatus'),
       );
+
+      final callable = functions.httpsCallable('updateTransactionStatus');
+
+      await callable.call({'tripRequestId': requestId, 'newStatus': newStatus});
 
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Status updated')));
+      ).showSnackBar(const SnackBar(content: Text('Status updated')));
+    }
+
+    Future<void> update(String newStatus) async {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw Exception('User not logged in');
+      }
+
+      final token = await user.getIdToken(true);
+
+      final response = await http.post(
+        Uri.parse(
+          'https://us-central1-carrygo-55444.cloudfunctions.net/updateTransactionStatusHttp',
+        ),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'tripRequestId': requestId, 'newStatus': newStatus}),
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('API failed: ${response.body}');
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Status updated')));
     }
 
     if (isTraveller) {

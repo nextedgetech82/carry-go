@@ -24,6 +24,10 @@ class PostRequestController extends StateNotifier<bool> {
     final model = FetchRequestModel(
       id: doc.id,
       buyerId: uid,
+      // 🔥 ADD THESE
+      tripId: "",
+      tripRequestId: "",
+      travellerId: "",
       fromCity: input.fromCity,
       toCity: input.toCity,
       itemName: input.itemName,

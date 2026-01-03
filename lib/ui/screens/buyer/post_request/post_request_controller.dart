@@ -31,6 +31,9 @@ class PostRequestController extends StateNotifier<bool> {
         budget: input.budget,
         deadline: input.deadline,
         status: 'open',
+        tripRequestId: '',
+        tripId: '',
+        travellerId: '',
       );
 
       await doc.set(model.toMap());

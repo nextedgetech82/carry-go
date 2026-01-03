@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -12,6 +14,15 @@ final appRouter = AppRouter();
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // FirebaseFunctions.instance.useFunctionsEmulator(
+  //   '10.0.2.2', // 🔥 NOT 127.0.0.1
+  //   5001,
+  // );
+
+  //FirebaseFirestore.instance.useFirestoreEmulator('10.0.2.2', 8080);
+
+  print(Firebase.app().options.projectId);
 
   runApp(const ProviderScope(child: MyApp()));
 }

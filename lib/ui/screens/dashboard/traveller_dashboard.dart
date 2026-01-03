@@ -7,6 +7,8 @@ import 'package:carrygo/ui/screens/chat/traveler_chatstream_provider.dart';
 import 'package:carrygo/ui/screens/dashboard/accept_trip_provider.dart';
 import 'package:carrygo/ui/screens/dashboard/profile.dart';
 import 'package:carrygo/ui/screens/dashboard/traveller_drawer.dart';
+import 'package:carrygo/ui/screens/dashboard/wallet/wallet_provider.dart';
+import 'package:carrygo/ui/screens/dashboard/wallet/wallet_screen.dart';
 import 'package:carrygo/ui/screens/sender/incoming_requests_provider.dart';
 import 'package:carrygo/ui/screens/trip/add_trip_screen.dart';
 import 'package:carrygo/ui/screens/trip/trip_details_screen.dart';
@@ -569,85 +571,85 @@ class _DashboardBody extends ConsumerWidget {
     required this.profile,
   });
 
-  Future<void> acceptTripRequest2(
-    BuildContext context,
-    String tripRequestId,
-    Map<String, dynamic> r,
-  ) async {
-    final db = FirebaseFirestore.instance;
+  // Future<void> acceptTripRequest2(
+  //   BuildContext context,
+  //   String tripRequestId,
+  //   Map<String, dynamic> r,
+  // ) async {
+  //   final db = FirebaseFirestore.instance;
 
-    await db.runTransaction((tx) async {
-      bool tripCompleted = false;
+  //   await db.runTransaction((tx) async {
+  //     bool tripCompleted = false;
 
-      final tripRef = db.collection('trips').doc(r['tripId']);
-      final trRef = db.collection('trip_requests').doc(tripRequestId);
-      final reqRef = db.collection('requests').doc(r['requestId']);
+  //     final tripRef = db.collection('trips').doc(r['tripId']);
+  //     final trRef = db.collection('trip_requests').doc(tripRequestId);
+  //     final reqRef = db.collection('requests').doc(r['requestId']);
 
-      final tripSnap = await tx.get(tripRef);
-      final available = (tripSnap['availableWeightKg'] as num).toDouble();
-      //final requested = (r['requestedWeight'] as num).toDouble();
-      final requested = (r['requestedWeightKg'] as num).toDouble();
+  //     final tripSnap = await tx.get(tripRef);
+  //     final available = (tripSnap['availableWeightKg'] as num).toDouble();
+  //     //final requested = (r['requestedWeight'] as num).toDouble();
+  //     final requested = (r['requestedWeightKg'] as num).toDouble();
 
-      if (available < requested) {
-        throw Exception('Not enough available weight');
-      }
+  //     if (available < requested) {
+  //       throw Exception('Not enough available weight');
+  //     }
 
-      final remaining = available - requested;
-      tripCompleted = remaining <= 0;
+  //     final remaining = available - requested;
+  //     tripCompleted = remaining <= 0;
 
-      /// 🔹 UPDATE TRIP
-      tx.update(tripRef, {
-        'availableWeightKg': remaining,
-        'status': tripCompleted ? 'completed' : 'active',
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+  //     /// 🔹 UPDATE TRIP
+  //     tx.update(tripRef, {
+  //       'availableWeightKg': remaining,
+  //       'status': tripCompleted ? 'completed' : 'active',
+  //       'updatedAt': FieldValue.serverTimestamp(),
+  //     });
 
-      /// 🔹 Accept current trip_request
-      tx.update(trRef, {
-        'status': RequestStatus.accepted,
-        'acceptedAt': FieldValue.serverTimestamp(),
-      });
+  //     /// 🔹 Accept current trip_request
+  //     tx.update(trRef, {
+  //       'status': RequestStatus.accepted,
+  //       'acceptedAt': FieldValue.serverTimestamp(),
+  //     });
 
-      // updateRequestStatus(
-      //   requestId: r['requestId'],
-      //   newStatus: RequestStatus.accepted,
-      // );
+  //     // updateRequestStatus(
+  //     //   requestId: r['requestId'],
+  //     //   newStatus: RequestStatus.accepted,
+  //     // );
 
-      //tx.update(tripRef, {'availableWeightKg': available - requested});
+  //     //tx.update(tripRef, {'availableWeightKg': available - requested});
 
-      /// 🔹 ACCEPT BUYER REQUEST
-      tx.update(reqRef, {
-        'status': RequestStatus.accepted,
-        'acceptedAt': FieldValue.serverTimestamp(),
-      });
+  //     /// 🔹 ACCEPT BUYER REQUEST
+  //     tx.update(reqRef, {
+  //       'status': RequestStatus.accepted,
+  //       'acceptedAt': FieldValue.serverTimestamp(),
+  //     });
 
-      /// 🔹 CREATE CHAT
-      final chatRef = db.collection('chats').doc(r['requestId']);
+  //     /// 🔹 CREATE CHAT
+  //     final chatRef = db.collection('chats').doc(r['requestId']);
 
-      tx.set(chatRef, {
-        'requestId': r['requestId'],
-        'buyerId': r['buyerId'],
-        'travellerId': r['travellerId'],
-        'lastMessage': 'Chat started',
-        'lastSenderId': 'system',
-        'trip_request_id': tripRequestId,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+  //     tx.set(chatRef, {
+  //       'requestId': r['requestId'],
+  //       'buyerId': r['buyerId'],
+  //       'travellerId': r['travellerId'],
+  //       'lastMessage': 'Chat started',
+  //       'lastSenderId': 'system',
+  //       'trip_request_id': tripRequestId,
+  //       'updatedAt': FieldValue.serverTimestamp(),
+  //     });
 
-      /// 🔹 2️⃣ AUTO-REJECT REMAINING REQUESTS
-      /// Auto Reject Pending Requests
-      // if (tripCompleted) {
-      //   await _rejectPendingRequests(r['tripId'], tripRequestId);
-      // }
+  //     /// 🔹 2️⃣ AUTO-REJECT REMAINING REQUESTS
+  //     /// Auto Reject Pending Requests
+  //     // if (tripCompleted) {
+  //     //   await _rejectPendingRequests(r['tripId'], tripRequestId);
+  //     // }
 
-      // ✅ Update buyer request
-      //tx.update(reqRef, {'status': 'accepted'});
-    });
+  //     // ✅ Update buyer request
+  //     //tx.update(reqRef, {'status': 'accepted'});
+  //   });
 
-    // ScaffoldMessenger.of(
-    //   context,
-    // ).showSnackBar(const SnackBar(content: Text('Request accepted')));
-  }
+  //   // ScaffoldMessenger.of(
+  //   //   context,
+  //   // ).showSnackBar(const SnackBar(content: Text('Request accepted')));
+  // }
 
   Future<void> acceptTripRequest(
     String tripRequestId,
@@ -662,6 +664,9 @@ class _DashboardBody extends ConsumerWidget {
       final reqRef = db.collection('requests').doc(r['requestId']);
       final chatRef = db.collection('chats').doc(r['requestId']);
 
+      // 🔥 NEW: transaction document
+      //final transactionRef = db.collection('transactions').doc(tripRequestId);
+
       final tripSnap = await tx.get(tripRef);
       final available = (tripSnap['availableWeightKg'] as num).toDouble();
       final requested = (r['requestedWeightKg'] as num).toDouble();
@@ -673,23 +678,36 @@ class _DashboardBody extends ConsumerWidget {
       final remaining = available - requested;
       tripCompleted = remaining <= 0;
 
+      /// ───── UPDATE TRIP ─────
       tx.update(tripRef, {
         'availableWeightKg': remaining,
         'status': tripCompleted ? 'completed' : 'active',
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
+      /// ───── ACCEPT TRIP REQUEST ─────
       tx.update(trRef, {
         'status': RequestStatus.accepted,
         'acceptedAt': FieldValue.serverTimestamp(),
       });
 
+      /// ───── ACCEPT BUYER REQUEST ─────
+      // tx.update(reqRef, {
+      //   'status': RequestStatus.accepted,
+      //   //'travellerId': r['travellerId'],
+      //   'travellerId': FirebaseAuth.instance.currentUser!.uid,
+      //   'acceptedAt': FieldValue.serverTimestamp(),
+      // });
+      // update request
       tx.update(reqRef, {
         'status': RequestStatus.accepted,
-        'travellerId': r['travellerId'],
+        'travellerId': FirebaseAuth.instance.currentUser!.uid,
+        'tripId': r['tripId'],
+        'tripRequestId': tripRequestId,
         'acceptedAt': FieldValue.serverTimestamp(),
       });
 
+      // /// ───── CREATE CHAT ─────
       tx.set(chatRef, {
         'requestId': r['requestId'],
         'buyerId': r['buyerId'],
@@ -701,6 +719,25 @@ class _DashboardBody extends ConsumerWidget {
       }, SetOptions(merge: true));
     });
 
+    await FirebaseFirestore.instance
+        .collection('transactions')
+        .doc(tripRequestId)
+        .set({
+          'requestId': r['requestId'],
+          'tripRequestId': tripRequestId,
+          'buyerId': r['buyerId'],
+          'travellerId': r['travellerId'],
+
+          'amount': r['totalPrice'],
+          'platformFee': (r['totalPrice'] as num) * 0.10,
+          'travellerEarning': (r['totalPrice'] as num) * 0.90,
+
+          'status': 'ACCEPTED',
+
+          'timestamps': {'acceptedAt': FieldValue.serverTimestamp()},
+        });
+
+    /// ───── AUTO REJECT OTHERS ─────
     if (tripCompleted) {
       await _rejectPendingRequests(r['tripId'], tripRequestId);
     }
@@ -775,11 +812,7 @@ class _DashboardBody extends ConsumerWidget {
           /// 🔹 Stats
           Row(
             children: const [
-              _StatCard(
-                title: 'Total Earnings',
-                value: '₹0',
-                icon: Icons.currency_rupee,
-              ),
+              _WalletHeader(), // 👈 LIVE wallet
               SizedBox(width: 16),
               _StatCard(title: 'Trips', value: '0', icon: Icons.flight_takeoff),
             ],
@@ -1385,6 +1418,60 @@ class _StatusBadge extends StatelessWidget {
           color: color,
           fontSize: 11,
           fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
+class _WalletHeader extends ConsumerWidget {
+  const _WalletHeader();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final walletAsync = ref.watch(walletProvider);
+    final theme = Theme.of(context);
+
+    return walletAsync.when(
+      loading: () => _walletCard(theme, '₹0', isLoading: true),
+      error: (_, __) => _walletCard(theme, '₹0'),
+      data: (snap) {
+        final balance = (snap.data()?['balance'] ?? 0).toDouble();
+        return GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => WalletScreen()),
+            );
+          },
+          child: _walletCard(theme, '₹${balance.toStringAsFixed(0)}'),
+        );
+      },
+    );
+  }
+
+  Widget _walletCard(ThemeData theme, String amount, {bool isLoading = false}) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.primary.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.account_balance_wallet),
+            const SizedBox(height: 12),
+            Text(
+              isLoading ? 'Loading...' : amount,
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Text('Wallet Balance'),
+          ],
         ),
       ),
     );
