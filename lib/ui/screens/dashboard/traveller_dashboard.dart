@@ -1432,47 +1432,47 @@ class _WalletHeader extends ConsumerWidget {
     final walletAsync = ref.watch(walletProvider);
     final theme = Theme.of(context);
 
-    return walletAsync.when(
-      loading: () => _walletCard(theme, '₹0', isLoading: true),
-      error: (_, __) => _walletCard(theme, '₹0'),
-      data: (snap) {
-        final balance = (snap.data()?['balance'] ?? 0).toDouble();
-        return GestureDetector(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => WalletScreen()),
-            );
-          },
-          child: _walletCard(theme, '₹${balance.toStringAsFixed(0)}'),
-        );
-      },
+    return Expanded(
+      child: walletAsync.when(
+        loading: () => _walletCard(theme, '₹0', isLoading: true),
+        error: (_, __) => _walletCard(theme, '₹0'),
+        data: (snap) {
+          final balance = (snap.data()?['balance'] ?? 0).toDouble();
+          return GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => WalletScreen()),
+              );
+            },
+            child: _walletCard(theme, '₹${balance.toStringAsFixed(0)}'),
+          );
+        },
+      ),
     );
   }
 
   Widget _walletCard(ThemeData theme, String amount, {bool isLoading = false}) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.primary.withOpacity(0.08),
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Icon(Icons.account_balance_wallet),
-            const SizedBox(height: 12),
-            Text(
-              isLoading ? 'Loading...' : amount,
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primary.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.account_balance_wallet),
+          const SizedBox(height: 12),
+          Text(
+            isLoading ? 'Loading...' : amount,
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.bold,
             ),
-            const SizedBox(height: 4),
-            const Text('Wallet Balance'),
-          ],
-        ),
+          ),
+          const SizedBox(height: 4),
+          const Text('Wallet Balance'),
+        ],
       ),
     );
   }

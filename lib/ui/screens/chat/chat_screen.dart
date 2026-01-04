@@ -489,9 +489,18 @@ class _ChatStatusAction extends ConsumerWidget {
         //   color: Colors.green,
         // )
         case RequestStatus.delivered:
-          return _actionButton(
-            label: 'Confirm Delivery',
-            onTap: () => update(RequestStatus.completed),
+          return Row(
+            children: [
+              _actionButton(
+                label: 'Confirm Delivery',
+                onTap: () => update(RequestStatus.completed),
+              ),
+              const SizedBox(width: 8),
+              _outlineActionButton(
+                label: 'Raise Dispute',
+                onTap: () => raiseDispute(context),
+              ),
+            ],
           );
       }
       // if (status == RequestStatus.delivered) {
@@ -503,6 +512,65 @@ class _ChatStatusAction extends ConsumerWidget {
     }
 
     return const SizedBox.shrink();
+  }
+
+  Future<void> raiseDispute(BuildContext context) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      throw Exception('User not logged in');
+    }
+
+    final token = await user.getIdToken(true);
+
+    final response = await http.post(
+      Uri.parse(
+        'https://us-central1-carrygo-55444.cloudfunctions.net/raiseDisputeHttp',
+      ),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'tripRequestId': requestId,
+        'reason': 'Item issue', // can make dynamic later
+        'description': 'Buyer raised dispute from chat',
+      }),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception(response.body);
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Dispute raised successfully')),
+    );
+  }
+
+  Widget _outlineActionButton({
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 12),
+      child: OutlinedButton(
+        onPressed: onTap,
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          side: const BorderSide(color: Colors.red),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Colors.red,
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _actionButton({required String label, required VoidCallback onTap}) {
