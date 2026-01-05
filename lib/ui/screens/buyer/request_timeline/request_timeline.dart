@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 
+import 'package:flutter/material.dart';
+
 class RequestTimeline extends StatelessWidget {
   final String status;
 
   const RequestTimeline({super.key, required this.status});
+
+  bool _done(List<String> statuses) => statuses.contains(status);
 
   @override
   Widget build(BuildContext context) {
@@ -11,19 +15,69 @@ class RequestTimeline extends StatelessWidget {
       children: [
         _Step(title: 'Request Sent', done: true),
         _Divider(),
+
         _Step(
           title: 'Accepted by Traveller',
-          done: status == 'accepted' || status == 'completed',
-          error: status == 'rejected',
+          done: _done([
+            'accepted',
+            'purchased',
+            'in_transit',
+            'delivered',
+            'confirmed_delivery',
+            'completed',
+            'disputed',
+          ]),
+          error: status == 'cancelled',
         ),
         _Divider(),
-        _Step(title: 'Purchased by Traveller', done: status == 'purchased'),
+
+        _Step(
+          title: 'Purchased by Traveller',
+          done: _done([
+            'purchased',
+            'in_transit',
+            'delivered',
+            'confirmed_delivery',
+            'completed',
+            'disputed',
+          ]),
+        ),
         _Divider(),
-        _Step(title: 'In Transit', done: status == 'in_transit'),
+
+        _Step(
+          title: 'In Transit',
+          done: _done([
+            'in_transit',
+            'delivered',
+            'confirmed_delivery',
+            'completed',
+            'disputed',
+          ]),
+        ),
         _Divider(),
-        _Step(title: 'Delivered', done: status == 'delivered'),
+
+        _Step(
+          title: 'Delivered',
+          done: _done([
+            'delivered',
+            'confirmed_delivery',
+            'completed',
+            'disputed',
+          ]),
+        ),
         _Divider(),
-        _Step(title: 'Trip Completed', done: status == 'completed'),
+
+        _Step(
+          title: 'Delivery Confirmed',
+          done: _done(['confirmed_delivery', 'completed', 'disputed']),
+        ),
+        _Divider(),
+
+        _Step(
+          title: status == 'disputed' ? 'Dispute Raised' : 'Trip Completed',
+          done: status == 'completed',
+          error: status == 'disputed',
+        ),
       ],
     );
   }

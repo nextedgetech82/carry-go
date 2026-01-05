@@ -298,14 +298,29 @@ class _AcceptedRequestCard extends ConsumerWidget {
         text = 'Delivered';
         break;
 
+      case RequestStatus.confirmedDelivery:
+        color = Colors.teal;
+        text = 'Delivery Confirmed';
+        break;
+
       case RequestStatus.completed:
         color = Colors.green.shade700;
         text = 'Completed';
         break;
 
+      case RequestStatus.disputed:
+        color = Colors.red;
+        text = 'Disputed';
+        break;
+
+      case RequestStatus.cancelled:
+        color = Colors.grey;
+        text = 'Cancelled';
+        break;
+
       default:
         color = Colors.grey;
-        text = status;
+        text = status.toUpperCase();
     }
 
     return Chip(

@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:carrygo/ui/screens/buyer/my_requests/my_requests_provider.dart';
 import 'package:carrygo/ui/screens/buyer/request_timeline/request_status.dart';
+import 'package:carrygo/ui/screens/chat/dispute_evidance_screen.dart';
 import 'package:carrygo/ui/screens/chat/traveler_chatstream_provider.dart';
 import 'package:carrygo/ui/screens/dashboard/accept_trip_provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -84,7 +85,29 @@ class ChatScreen extends ConsumerWidget {
         ),
 
         /// 🔥 ACTION BUTTON IN HEADER
-        actions: [
+        // actions: [
+        //   requestAsync.when(
+        //     loading: () => const SizedBox.shrink(),
+        //     error: (_, __) => const SizedBox.shrink(),
+        //     data: (reqSnap) {
+        //       if (!reqSnap.exists) return const SizedBox.shrink();
+
+        //       final r = reqSnap.data()!;
+        //       final status = r['status'] as String;
+        //       final isTraveller = r['travellerId'] == uid;
+
+        //       return _ChatStatusAction(
+        //         requestId: requestId,
+        //         status: status,
+        //         isTraveller: isTraveller,
+        //         chatId: chatId,
+        //       );
+        //     },
+        //   ),
+        // ],
+      ),
+      body: Column(
+        children: [
           requestAsync.when(
             loading: () => const SizedBox.shrink(),
             error: (_, __) => const SizedBox.shrink(),
@@ -95,7 +118,7 @@ class ChatScreen extends ConsumerWidget {
               final status = r['status'] as String;
               final isTraveller = r['travellerId'] == uid;
 
-              return _ChatStatusAction(
+              return _ChatActionBar(
                 requestId: requestId,
                 status: status,
                 isTraveller: isTraveller,
@@ -103,10 +126,7 @@ class ChatScreen extends ConsumerWidget {
               );
             },
           ),
-        ],
-      ),
-      body: Column(
-        children: [
+
           /// ─────────── MESSAGES ───────────
           Expanded(
             child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
@@ -182,64 +202,6 @@ class ChatScreen extends ConsumerWidget {
       ),
     );
   }
-}
-
-Widget buildActionBar({
-  required String status,
-  required bool isTraveller,
-  required VoidCallback onPurchased,
-  required VoidCallback onInTransit,
-  required VoidCallback onDelivered,
-  required VoidCallback onCompleted,
-}) {
-  if (isTraveller) {
-    switch (status) {
-      case RequestStatus.accepted:
-        return ElevatedButton(
-          onPressed: onPurchased,
-          child: const Text('Mark Purchased'),
-        );
-      case RequestStatus.purchased:
-        return ElevatedButton(
-          onPressed: onInTransit,
-          child: const Text('Start Journey'),
-        );
-      case RequestStatus.inTransit:
-        return ElevatedButton(
-          onPressed: onDelivered,
-          child: const Text('Mark Delivered'),
-        );
-    }
-  } else {
-    /// 🔥 ACTION BUTTON IN HEADER
-    switch (status) {
-      case RequestStatus.purchased:
-        return infoChip(
-          text: 'Item Purchased',
-          icon: Icons.shopping_bag,
-          color: Colors.orange,
-        );
-      case RequestStatus.inTransit:
-        return infoChip(
-          text: 'In Transit',
-          icon: Icons.local_shipping,
-          color: Colors.purple,
-        );
-      case RequestStatus.delivered:
-        return ElevatedButton(
-          onPressed: onDelivered,
-          child: const Text('Confirm Delivery'),
-        );
-    }
-    // if (status == RequestStatus.delivered) {
-    //   return ElevatedButton(
-    //     onPressed: onCompleted,
-    //     child: const Text('Confirm Delivery'),
-    //   );
-    // }
-  }
-
-  return const SizedBox.shrink();
 }
 
 Widget infoChip({
@@ -467,8 +429,15 @@ class _ChatStatusAction extends ConsumerWidget {
             label: 'Mark Delivered',
             onTap: () => update(RequestStatus.delivered),
           );
+        case RequestStatus.disputed:
+          return infoChip(
+            text: 'Dispute Raised • Under Review',
+            icon: Icons.report_problem,
+            color: Colors.red,
+          );
       }
     } else {
+      //Buyer
       switch (status) {
         case RequestStatus.purchased:
           return infoChip(
@@ -488,12 +457,59 @@ class _ChatStatusAction extends ConsumerWidget {
         //   icon: Icons.check_circle,
         //   color: Colors.green,
         // )
+        case RequestStatus.confirmedDelivery:
+          return Row(
+            children: [
+              infoChip(
+                text: 'Delivery Confirmed',
+                icon: Icons.check_circle,
+                color: Colors.green,
+              ),
+              const SizedBox(width: 8),
+              _outlineActionButton(
+                label: 'Raise Dispute',
+                onTap: () => raiseDispute(context),
+              ),
+            ],
+          );
+        case RequestStatus.disputed:
+          return Row(
+            children: [
+              infoChip(
+                text: 'Dispute in Review',
+                icon: Icons.report_problem,
+                color: Colors.red,
+              ),
+              const SizedBox(width: 8),
+              _outlineActionButton(
+                label: 'Upload Evidence',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          DisputeEvidenceScreen(tripRequestId: requestId),
+                    ),
+                  );
+                },
+              ),
+            ],
+          );
+
+        case RequestStatus.completed:
+          return infoChip(
+            text: 'Completed',
+            icon: Icons.verified,
+            color: Colors.green,
+          );
+
         case RequestStatus.delivered:
           return Row(
             children: [
               _actionButton(
                 label: 'Confirm Delivery',
-                onTap: () => update(RequestStatus.completed),
+                //onTap: () => update(RequestStatus.completed),
+                onTap: () => update(RequestStatus.confirmedDelivery),
               ),
               const SizedBox(width: 8),
               _outlineActionButton(
@@ -798,4 +814,35 @@ String formatMessageTime(DateTime dt) {
   final minute = dt.minute.toString().padLeft(2, '0');
   final ampm = dt.hour >= 12 ? 'PM' : 'AM';
   return '$hour:$minute $ampm';
+}
+
+class _ChatActionBar extends ConsumerWidget {
+  final String requestId;
+  final String status;
+  final bool isTraveller;
+  final String chatId;
+
+  const _ChatActionBar({
+    required this.requestId,
+    required this.status,
+    required this.isTraveller,
+    required this.chatId,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+      ),
+      child: _ChatStatusAction(
+        requestId: requestId,
+        status: status,
+        isTraveller: isTraveller,
+        chatId: chatId,
+      ),
+    );
+  }
 }

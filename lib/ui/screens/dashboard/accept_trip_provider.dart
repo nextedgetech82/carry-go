@@ -17,6 +17,8 @@ final acceptedTripRequestsProvider =
               'purchased',
               'in_transit',
               'delivered',
+              'confirmed_delivery',
+              'disputed',
               'completed',
               'cancelled',
             ],

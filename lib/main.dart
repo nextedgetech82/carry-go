@@ -10,6 +10,7 @@ import 'ui/screens/splash/splash_screen.dart';
 import 'theme/app_theme.dart';
 
 final appRouter = AppRouter();
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -33,6 +34,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       title: 'Travel Fetcher',
       home: const SplashScreen(),

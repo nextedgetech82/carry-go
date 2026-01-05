@@ -4,6 +4,7 @@ class RequestStatus {
   static const purchased = 'purchased';
   static const inTransit = 'in_transit';
   static const delivered = 'delivered';
+  static const confirmedDelivery = 'confirmed_delivery';
   static const completed = 'completed';
   static const cancelled = 'cancelled';
 

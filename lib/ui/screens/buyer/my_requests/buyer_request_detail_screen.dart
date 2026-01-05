@@ -34,6 +34,8 @@ class BuyerRequestDetailScreen extends StatelessWidget {
             'purchased',
             'in_transit',
             'delivered',
+            'confirmed_delivery',
+            'disputed',
             'completed',
             'cancelled',
           ],
@@ -133,7 +135,9 @@ class BuyerRequestDetailScreen extends StatelessWidget {
                         tripStatus == 'purchased' ||
                         tripStatus == 'in_transit' ||
                         tripStatus == 'delivered' ||
+                        tripStatus == 'confirmed_delivery' ||
                         tripStatus == 'cancelled' ||
+                        tripStatus == 'disputed' ||
                         tripStatus == 'completed')
                       _AcceptedCTA(
                         //context: context,
