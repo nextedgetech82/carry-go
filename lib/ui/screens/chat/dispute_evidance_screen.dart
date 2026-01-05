@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:carrygo/main.dart';
+import 'package:carrygo/ui/screens/chat/full_image_screen.dart';
 import 'package:carrygo/ui/screens/chat/pdf_preview_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:file_picker/file_picker.dart';
@@ -410,31 +411,7 @@ class _EvidenceCard extends StatelessWidget {
   void _openImageViewer(BuildContext context, String url) {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => _FullImageViewer(imageUrl: url)),
-    );
-  }
-}
-
-class _FullImageViewer extends StatelessWidget {
-  final String imageUrl;
-
-  const _FullImageViewer({required this.imageUrl});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-        iconTheme: const IconThemeData(color: Colors.white),
-      ),
-      body: Center(
-        child: InteractiveViewer(
-          minScale: 0.8,
-          maxScale: 4.0,
-          child: Image.network(imageUrl),
-        ),
-      ),
+      MaterialPageRoute(builder: (_) => FullImageViewer(imageUrl: url)),
     );
   }
 }

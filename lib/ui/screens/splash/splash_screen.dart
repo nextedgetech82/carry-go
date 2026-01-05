@@ -1,3 +1,4 @@
+import 'package:carrygo/ui/screens/admin/admin_dashboard_screen.dart';
 import 'package:carrygo/ui/screens/buyer/dashboard/buyer_dashboard_screen.dart';
 import 'package:carrygo/ui/screens/sender/sender_dashboard.dart';
 import 'package:carrygo/ui/screens/signin/signin_screen.dart';
@@ -73,6 +74,9 @@ class SplashScreen extends ConsumerWidget {
         // role missing, redirect to signup or role selection flow
         //page = const SignupScreen();
         page = const RoleSelectionScreenNew();
+        break;
+      case StartupResult.adminDashboard:
+        page = const AdminDashboardScreen();
         break;
     }
 

@@ -24,6 +24,13 @@ final startupProvider = FutureProvider<StartupResult>((ref) async {
 
   await user.reload();
 
+  // 3️⃣ 🔥 ADMIN CHECK (CUSTOM CLAIMS)
+  //final tokenResult = await user.getIdTokenResult(true);
+  //final isAdmin = tokenResult.claims?['role'] == 'admin';
+  // if (isAdmin) {
+  //   return StartupResult.adminDashboard;
+  // }
+
   // 3️⃣ Email verification
   // if (!user.emailVerified) {
   //   return StartupResult.emailVerification;
@@ -52,8 +59,14 @@ final startupProvider = FutureProvider<StartupResult>((ref) async {
   if (role == 'traveller') {
     return StartupResult.travellerDashboard;
   } else if (role == 'sender') {
-    //return StartupResult.senderDashboard;
     return StartupResult.senderDashboard;
+  } else if (role == 'admin') {
+    final user = FirebaseAuth.instance.currentUser!;
+    final idToken = await user.getIdTokenResult(true);
+
+    print('CLAIMS: ${idToken.claims}');
+
+    return StartupResult.adminDashboard;
   } else {
     return StartupResult.roleSelection;
   }

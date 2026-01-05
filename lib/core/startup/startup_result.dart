@@ -7,4 +7,6 @@ enum StartupResult {
   senderDashboard,
   roleSelection,
   signin,
+
+  adminDashboard, // 👈 ADD THIS
 }
