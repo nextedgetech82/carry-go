@@ -30,6 +30,7 @@ class ChatScreen extends ConsumerWidget {
     final theme = Theme.of(context);
 
     final requestAsync = ref.watch(requestByIdProvider(requestId));
+    String reqStatus = "";
     // final otherUserProfileAsync =
     // ref.watch(userProfileByIdProvider(otherUserId));
 
@@ -117,6 +118,7 @@ class ChatScreen extends ConsumerWidget {
               final r = reqSnap.data()!;
               final status = r['status'] as String;
               final isTraveller = r['travellerId'] == uid;
+              reqStatus = status;
 
               return _ChatActionBar(
                 requestId: requestId,
@@ -197,7 +199,11 @@ class ChatScreen extends ConsumerWidget {
           ),
 
           /// ─────────── INPUT ───────────
-          ChatInput(chatId: chatId),
+          //ChatInput(chatId: chatId),
+          if (reqStatus != RequestStatus.completed)
+            ChatInput(chatId: chatId)
+          else
+            const _ChatLockedBanner(),
         ],
       ),
     );
@@ -383,6 +389,81 @@ class _ChatStatusAction extends ConsumerWidget {
       ).showSnackBar(const SnackBar(content: Text('Status updated')));
     }
 
+    Future<void> _requestAppeal(String reason) async {
+      final user = FirebaseAuth.instance.currentUser!;
+      final token = await user.getIdToken(true);
+
+      final response = await http.post(
+        Uri.parse(
+          'https://us-central1-carrygo-55444.cloudfunctions.net/requestAppealHttp',
+        ),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'tripRequestId': requestId,
+          'reason': reason,
+          'chatId': chatId,
+        }),
+      );
+
+      if (response.statusCode != 200) {
+        String message = 'Something went wrong';
+
+        try {
+          final body = jsonDecode(response.body);
+          if (body is Map && body['error'] != null) {
+            message = body['error'].toString();
+          }
+        } catch (_) {
+          message = response.body.toString();
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: Colors.red.shade600,
+          ),
+        );
+
+        return; // ⛔ stop further execution
+      }
+    }
+
+    void _openAppealDialog(BuildContext context) {
+      final controller = TextEditingController();
+
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('Request Appeal'),
+          content: TextField(
+            controller: controller,
+            maxLines: 4,
+            decoration: const InputDecoration(
+              hintText: 'Explain why this decision should be reviewed',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (controller.text.trim().isEmpty) return;
+
+                await _requestAppeal(controller.text.trim());
+                Navigator.pop(context);
+              },
+              child: const Text('Submit Appeal'),
+            ),
+          ],
+        ),
+      );
+    }
+
     Future<void> update(String newStatus) async {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
@@ -497,10 +578,19 @@ class _ChatStatusAction extends ConsumerWidget {
           );
 
         case RequestStatus.completed:
-          return infoChip(
-            text: 'Completed',
-            icon: Icons.verified,
-            color: Colors.green,
+          return Row(
+            children: [
+              infoChip(
+                text: 'Dispute Resolved',
+                icon: Icons.verified,
+                color: Colors.green,
+              ),
+              const SizedBox(width: 8),
+              _outlineActionButton(
+                label: 'Request Appeal',
+                onTap: () => _openAppealDialog(context),
+              ),
+            ],
           );
 
         case RequestStatus.delivered:
@@ -554,7 +644,10 @@ class _ChatStatusAction extends ConsumerWidget {
     );
 
     if (response.statusCode != 200) {
-      throw Exception(response.body);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(response.body)));
+      //throw Exception(response.body);
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -842,6 +935,29 @@ class _ChatActionBar extends ConsumerWidget {
         status: status,
         isTraveller: isTraveller,
         chatId: chatId,
+      ),
+    );
+  }
+}
+
+class _ChatLockedBanner extends StatelessWidget {
+  const _ChatLockedBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      color: Colors.grey.shade200,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: const [
+          Icon(Icons.lock, size: 16, color: Colors.grey),
+          SizedBox(width: 8),
+          Text(
+            'Chat locked after dispute resolution',
+            style: TextStyle(color: Colors.grey),
+          ),
+        ],
       ),
     );
   }

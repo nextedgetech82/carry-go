@@ -250,6 +250,11 @@ class _AcceptedCTA extends StatelessWidget {
       'createdAt': FieldValue.serverTimestamp(),
       'lastMessage': '',
       'lastSenderId': '',
+
+      // ✅ new
+      'isClosed': false,
+      'closedAt': null,
+      'closedReason': null, // e.g. "DISPUTE_RESOLVED"
     });
   }
 
