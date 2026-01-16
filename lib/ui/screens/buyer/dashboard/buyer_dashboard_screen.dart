@@ -3,6 +3,8 @@ import 'package:carrygo/providers/user_profile_provider.dart';
 import 'package:carrygo/ui/screens/buyer/dashboard/buyer_drawer.dart';
 import 'package:carrygo/ui/screens/buyer/matching/buyer_trip_filter_provider.dart';
 import 'package:carrygo/ui/screens/buyer/requests/active_buyer_request_provider.dart';
+import 'package:carrygo/ui/screens/notifications/notification_history_screen.dart';
+import 'package:carrygo/widgets/notification_badge_icon.dart';
 import 'package:carrygo/widgets/role_badge.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -46,6 +48,18 @@ class BuyerDashboardScreen extends ConsumerWidget {
                   Tab(text: 'Matching Trips'),
                 ],
               ),
+              actions: [
+                NotificationBellIcon(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const NotificationHistoryScreen(),
+                      ),
+                    );
+                  },
+                ),
+              ],
             ),
 
             body: TabBarView(

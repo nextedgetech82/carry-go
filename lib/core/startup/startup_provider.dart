@@ -1,3 +1,4 @@
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -57,8 +58,10 @@ final startupProvider = FutureProvider<StartupResult>((ref) async {
   final role = doc.data()?['role'];
 
   if (role == 'traveller') {
+    await saveFcmToken();
     return StartupResult.travellerDashboard;
   } else if (role == 'sender') {
+    await saveFcmToken();
     return StartupResult.senderDashboard;
   } else if (role == 'admin') {
     final user = FirebaseAuth.instance.currentUser!;
@@ -66,8 +69,20 @@ final startupProvider = FutureProvider<StartupResult>((ref) async {
 
     print('CLAIMS: ${idToken.claims}');
 
+    await saveFcmToken();
     return StartupResult.adminDashboard;
   } else {
     return StartupResult.roleSelection;
   }
 });
+
+Future<void> saveFcmToken() async {
+  final token = await FirebaseMessaging.instance.getToken();
+  if (token == null) return;
+
+  final uid = FirebaseAuth.instance.currentUser!.uid;
+
+  await FirebaseFirestore.instance.collection('users').doc(uid).set({
+    'fcmTokens': FieldValue.arrayUnion([token]),
+  }, SetOptions(merge: true));
+}

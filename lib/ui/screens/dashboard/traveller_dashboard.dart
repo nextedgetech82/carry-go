@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:carrygo/core/startup/startup_provider.dart';
 import 'package:carrygo/providers/my_trips_provider.dart';
 import 'package:carrygo/providers/user_profile_provider.dart';
@@ -9,14 +11,17 @@ import 'package:carrygo/ui/screens/dashboard/profile.dart';
 import 'package:carrygo/ui/screens/dashboard/traveller_drawer.dart';
 import 'package:carrygo/ui/screens/dashboard/wallet/wallet_provider.dart';
 import 'package:carrygo/ui/screens/dashboard/wallet/wallet_screen.dart';
+import 'package:carrygo/ui/screens/notifications/notification_history_screen.dart';
 import 'package:carrygo/ui/screens/sender/incoming_requests_provider.dart';
 import 'package:carrygo/ui/screens/trip/add_trip_screen.dart';
 import 'package:carrygo/ui/screens/trip/trip_details_screen.dart';
+import 'package:carrygo/widgets/notification_badge_icon.dart';
 import 'package:carrygo/widgets/role_badge.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:http/http.dart' as http;
 
 bool isProfileComplete(Map<String, dynamic> profile) {
   return (profile['firstName'] != null &&
@@ -58,6 +63,18 @@ class TravellerDashboard extends ConsumerWidget {
               ],
             ),
             centerTitle: true,
+            actions: [
+              NotificationBellIcon(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const NotificationHistoryScreen(),
+                    ),
+                  );
+                },
+              ),
+            ],
           ),
 
           /// ✅ NOW profile IS AVAILABLE
@@ -768,6 +785,53 @@ class _DashboardBody extends ConsumerWidget {
         });
   }
 
+  Future<void> acceptTripRequestHttp(
+    String tripRequestId,
+    String requestId,
+  ) async {
+    final user = FirebaseAuth.instance.currentUser!;
+    final token = await user.getIdToken();
+
+    final res = await http.post(
+      Uri.parse(
+        'https://us-central1-carrygo-55444.cloudfunctions.net/acceptTripRequestHttp',
+      ),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'tripRequestId': tripRequestId,
+        'requestId': requestId,
+      }),
+    );
+
+    if (res.statusCode != 200) {
+      throw Exception(jsonDecode(res.body)['error']);
+    }
+  }
+
+  Future<void> rejectTripRequestHttp(String tripRequestId) async {
+    final user = FirebaseAuth.instance.currentUser!;
+    final token = await user.getIdToken(true);
+
+    final response = await http.post(
+      Uri.parse(
+        'https://us-central1-carrygo-55444.cloudfunctions.net/rejectTripRequestHttp',
+      ),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({'tripRequestId': tripRequestId}),
+    );
+
+    if (response.statusCode != 200) {
+      final body = jsonDecode(response.body);
+      throw Exception(body['error'] ?? 'Failed to reject request');
+    }
+  }
+
   Future<void> _rejectPendingRequests(
     String tripId,
     String acceptedTripRequestId,
@@ -1006,7 +1070,11 @@ class _DashboardBody extends ConsumerWidget {
                                   ),
                                   onPressed: () async {
                                     try {
-                                      await acceptTripRequest(tripRequestId, r);
+                                      //await acceptTripRequest(tripRequestId, r);
+                                      await acceptTripRequestHttp(
+                                        tripRequestId,
+                                        r['requestId'],
+                                      );
 
                                       ScaffoldMessenger.of(
                                         context,

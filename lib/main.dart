@@ -1,6 +1,9 @@
+import 'package:carrygo/services/notification_service.dart';
+import 'package:carrygo/services/push_notification_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
@@ -23,7 +26,9 @@ Future<void> main() async {
 
   //FirebaseFirestore.instance.useFirestoreEmulator('10.0.2.2', 8080);
 
-  print(Firebase.app().options.projectId);
+  //print(Firebase.app().options.projectId);
+
+  await NotificationService.init();
 
   runApp(const ProviderScope(child: MyApp()));
 }
@@ -41,6 +46,11 @@ class MyApp extends StatelessWidget {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       onGenerateRoute: appRouter.onGenerateRoute,
+      //Dhruv
+      builder: (context, child) {
+        PushNotificationService.init(context);
+        return child!;
+      },
     );
   }
 }
