@@ -19,6 +19,13 @@ subprojects {
     project.evaluationDependsOn(":app")
 }
 
+subprojects {
+    configurations.all {
+        // firebase-dynamic-links is removed from newer BoMs; force a known version.
+        resolutionStrategy.force("com.google.firebase:firebase-dynamic-links:21.2.0")
+    }
+}
+
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
 }

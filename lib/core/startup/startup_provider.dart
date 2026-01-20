@@ -70,7 +70,8 @@ final startupProvider = FutureProvider<StartupResult>((ref) async {
     print('CLAIMS: ${idToken.claims}');
 
     await saveFcmToken();
-    return StartupResult.adminDashboard;
+    //return StartupResult.adminDashboard;
+    return StartupResult.adminHomeScreen;
   } else {
     return StartupResult.roleSelection;
   }

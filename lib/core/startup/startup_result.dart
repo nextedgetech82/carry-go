@@ -9,4 +9,5 @@ enum StartupResult {
   signin,
 
   adminDashboard, // 👈 ADD THIS
+  adminHomeScreen,
 }

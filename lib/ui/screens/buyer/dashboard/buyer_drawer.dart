@@ -179,6 +179,11 @@ class BuyerDrawer extends ConsumerWidget {
     final phone = profile['phone'] ?? '';
     final complete = _isProfileComplete();
 
+    final bool phoneVerified = profile['phoneVerified'] == true;
+    final bool emailVerified = profile['emailVerified'] == true;
+
+    final bool isVerifiedUser = phoneVerified && emailVerified;
+
     final subtitle = profile['email'] ?? profile['phone'] ?? 'Verified user';
     final activeRole = profile['role'];
     final initials = displayName
@@ -316,8 +321,10 @@ class BuyerDrawer extends ConsumerWidget {
 
                 /// ✅ PROFILE STATUS BADGE
                 Icon(
-                  complete ? Icons.verified : Icons.warning_amber_rounded,
-                  color: complete ? Colors.greenAccent : Colors.orangeAccent,
+                  isVerifiedUser ? Icons.verified : Icons.warning_amber_rounded,
+                  color: isVerifiedUser
+                      ? Colors.greenAccent
+                      : Colors.orangeAccent,
                 ),
               ],
             ),

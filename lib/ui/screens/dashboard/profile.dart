@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:carrygo/providers/user_profile_provider.dart';
+import 'package:carrygo/ui/screens/dashboard/kyc_start_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -15,6 +16,7 @@ import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_cropper/image_cropper.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -23,13 +25,20 @@ class ProfileScreen extends ConsumerStatefulWidget {
   ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+class _ProfileScreenState extends ConsumerState<ProfileScreen>
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   final _formKey = GlobalKey<FormState>();
+
+  late TabController _tabController;
 
   late TextEditingController firstNameCtrl;
   late TextEditingController lastNameCtrl;
   late TextEditingController phoneCtrl;
   late TextEditingController emailCtrl;
+  late TextEditingController passwordCtrl;
+  late TextEditingController confirmPasswordCtrl;
+
+  bool hasPasswordProvider = false;
 
   late TextEditingController address1Ctrl;
   late TextEditingController address2Ctrl;
@@ -44,6 +53,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _uploadingPhoto = false;
   bool _pincodeLoading = false;
   bool _locationLoading = false;
+
+  //final user = FirebaseAuth.instance.currentUser!;
+  bool emailVerified = false;
 
   bool loading = false;
 
@@ -117,6 +129,24 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   void initState() {
     super.initState();
 
+    _tabController = TabController(length: 2, vsync: this);
+
+    WidgetsBinding.instance.addObserver(this);
+
+    final user = FirebaseAuth.instance.currentUser!;
+    emailVerified = user.emailVerified;
+
+    //await _autoSyncEmailVerification(); // 🔥 AUTO-SYNC HERE
+
+    hasPasswordProvider = user.providerData.any(
+      (p) => p.providerId == 'password',
+    );
+
+    // 🔥 Run async logic AFTER initState
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _autoSyncEmailVerification();
+    });
+
     final profile = ref.read(userProfileProvider).value!;
     _photoUrl = profile['photoUrl'];
 
@@ -124,6 +154,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     lastNameCtrl = TextEditingController(text: profile['lastName'] ?? '');
     phoneCtrl = TextEditingController(text: profile['phone'] ?? '');
     emailCtrl = TextEditingController(text: profile['email'] ?? '');
+
+    passwordCtrl = TextEditingController();
+    confirmPasswordCtrl = TextEditingController();
 
     final address = profile['address'] ?? {};
 
@@ -137,6 +170,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   @override
   void dispose() {
+    _tabController.dispose();
+    WidgetsBinding.instance.removeObserver(this);
+
     firstNameCtrl.dispose();
     lastNameCtrl.dispose();
     phoneCtrl.dispose();
@@ -150,6 +186,113 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     pincodeCtrl.dispose();
 
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _autoSyncEmailVerification();
+    }
+  }
+
+  Future<void> _autoSyncEmailVerification() async {
+    final user = FirebaseAuth.instance.currentUser!;
+    await user.reload();
+
+    if (user.emailVerified == true) {
+      await _syncEmailVerificationHttp();
+      if (mounted) {
+        setState(() {
+          emailVerified = true;
+        });
+      }
+    }
+  }
+
+  Future<bool> _linkEmailPassword() async {
+    final user = FirebaseAuth.instance.currentUser!;
+
+    // 1️⃣ Password length check
+    if (passwordCtrl.text.length < 6) {
+      _showError('Password must be at least 6 characters');
+      return false;
+    }
+
+    // 2️⃣ Password match check
+    if (passwordCtrl.text != confirmPasswordCtrl.text) {
+      _showError('Passwords do not match');
+      return false;
+    }
+
+    try {
+      final credential = EmailAuthProvider.credential(
+        email: emailCtrl.text.trim(),
+        password: passwordCtrl.text,
+      );
+
+      await user.linkWithCredential(credential);
+      await user.reload();
+
+      return true;
+    } on FirebaseAuthException catch (e) {
+      // 🔐 Known Firebase errors → show friendly message
+      switch (e.code) {
+        case 'email-already-in-use':
+          _showError('This email is already registered');
+          break;
+        case 'provider-already-linked':
+          // Safe to ignore (already linked)
+          return true;
+        case 'requires-recent-login':
+          _showError('Please re-login and try again');
+          break;
+        default:
+          _showError(e.message ?? 'Failed to link email');
+      }
+      return false;
+    } catch (_) {
+      _showError('Something went wrong. Try again.');
+      return false;
+    }
+  }
+
+  void _showError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> linkEmailToAuthUser({
+    required String email,
+    required String password,
+  }) async {
+    final user = FirebaseAuth.instance.currentUser!;
+
+    final credential = EmailAuthProvider.credential(
+      email: email,
+      password: password,
+    );
+
+    await user.linkWithCredential(credential);
+  }
+
+  Future<void> _sendEmailVerification() async {
+    final user = FirebaseAuth.instance.currentUser!;
+
+    // 🔐 SAFETY CHECK
+    if (user.email == null || user.email!.isEmpty) {
+      throw Exception('Email is not linked yet. Please save profile first.');
+    }
+
+    await user.sendEmailVerification(
+      ActionCodeSettings(
+        url: 'https://carrygo.app/verify',
+        handleCodeInApp: false,
+        androidPackageName: 'com.carrygo.app',
+        iOSBundleId: 'com.carrygo.app',
+      ),
+    );
   }
 
   Future<void> _chooseImageSource() async {
@@ -415,18 +558,56 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
+  Future<void> sendEmailVerificationProper(String email) async {
+    final user = FirebaseAuth.instance.currentUser!;
+
+    await user.verifyBeforeUpdateEmail(
+      email,
+      ActionCodeSettings(
+        url: 'https://carrygo.app/verify',
+        handleCodeInApp: false,
+        androidPackageName: 'com.carrygo.app',
+        androidInstallApp: true,
+        androidMinimumVersion: '1',
+        iOSBundleId: 'com.carrygo.app',
+      ),
+    );
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => loading = true);
 
-    final uid = FirebaseAuth.instance.currentUser!.uid;
+    final user = FirebaseAuth.instance.currentUser!;
+    final uid = user.uid;
 
+    if (!hasPasswordProvider) {
+      //await _linkEmailPassword();
+      final linked = await _linkEmailPassword();
+      if (!linked) {
+        setState(() => loading = false);
+        return;
+      }
+      hasPasswordProvider = true;
+    }
+    //final uid = FirebaseAuth.instance.currentUser!.uid;
+
+    // 🔐 1️⃣ LINK EMAIL TO AUTH (ONLY IF NOT LINKED)
+    if (user.email == null || user.email!.isEmpty) {
+      await linkEmailToAuthUser(
+        email: emailCtrl.text.trim(),
+        password: passwordCtrl.text,
+      );
+
+      await user.reload(); // IMPORTANT
+    }
     final photoUrl = await _uploadPhoto(uid);
 
     await FirebaseFirestore.instance.collection('users').doc(uid).update({
       'firstName': firstNameCtrl.text.trim(),
       'lastName': lastNameCtrl.text.trim(),
+      'email': emailCtrl.text.trim(),
       'photoUrl': photoUrl,
       'address': {
         'line1': address1Ctrl.text.trim(),
@@ -451,360 +632,639 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     //}
   }
 
+  Future<void> _syncEmailVerificationHttp() async {
+    final user = FirebaseAuth.instance.currentUser!;
+    final token = await user.getIdToken(true);
+
+    await http.post(
+      //Uri.parse('$BASE_URL/syncEmailVerificationHttp'),
+      Uri.parse(
+        'https://us-central1-carrygo-55444.cloudfunctions.net/syncEmailVerificationHttp',
+      ),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+    );
+
+    ref.invalidate(userProfileProvider);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    final profile = ref.watch(userProfileProvider).value ?? {};
+
+    final Map<String, dynamic> kyc = Map<String, dynamic>.from(
+      profile['kyc'] ?? {},
+    );
+    final String kycStatus = (kyc['status'] ?? 'NOT_STARTED').toString();
+
     return Scaffold(
-      appBar: AppBar(title: const Text('My Profile')),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).scaffoldBackgroundColor,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 12,
-              offset: const Offset(0, -4),
-            ),
+      appBar: AppBar(
+        title: const Text('My Profile'),
+        bottom: TabBar(
+          controller: _tabController,
+          tabs: const [
+            Tab(icon: Icon(Icons.person), text: 'Profile'),
+            Tab(icon: Icon(Icons.badge), text: 'KYC'),
           ],
         ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-            child: SizedBox(
-              height: 52,
-              child: ElevatedButton(
-                onPressed: (loading || _uploadingPhoto) ? null : _save,
-                child: loading || _uploadingPhoto
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text(
-                        'Save Changes',
-                        style: TextStyle(fontSize: 16),
-                      ),
-              ),
+      ),
+
+      bottomNavigationBar: AnimatedBuilder(
+        animation: _tabController,
+        builder: (context, _) {
+          if (_tabController.index != 0) {
+            return const SizedBox.shrink();
+          }
+          return Container(
+            decoration: BoxDecoration(
+              color: Theme.of(context).scaffoldBackgroundColor,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: 12,
+                  offset: const Offset(0, -4),
+                ),
+              ],
             ),
-          ),
+            child: _buildSaveButton(),
+          );
+        },
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          _buildProfileTab(theme),
+          _buildKycTab(theme, kyc, kycStatus),
+        ],
+      ),
+      //      body:
+    );
+  }
+
+  Widget _buildSaveButton() {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: ElevatedButton(
+          onPressed: loading ? null : _save,
+          child: loading
+              ? const CircularProgressIndicator(color: Colors.white)
+              : const Text('Save Changes'),
         ),
       ),
-      body: SafeArea(
-        child: Form(
-          key: _formKey,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                /// 🖼 PROFILE PHOTO
-                GestureDetector(
-                  onTap: _chooseImageSource,
-                  child: Stack(
-                    children: [
-                      Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          ClipOval(
-                            child: SizedBox(
-                              width: 92,
-                              height: 92,
-                              child: _selectedImage != null
-                                  ? Image.file(
-                                      _selectedImage!,
-                                      fit: BoxFit.cover,
-                                    )
-                                  : (_photoUrl != null && _photoUrl!.isNotEmpty)
-                                  ? CachedNetworkImage(
-                                      imageUrl: _photoUrl!,
-                                      fit: BoxFit.cover,
-                                      fadeInDuration: const Duration(
-                                        milliseconds: 250,
-                                      ),
-                                      placeholder: (context, url) => Stack(
-                                        alignment: Alignment.center,
-                                        children: [
-                                          _InitialsAvatar(
-                                            firstName: firstNameCtrl.text,
-                                            lastName: lastNameCtrl.text,
-                                          ),
-                                          const SizedBox(
-                                            width: 24,
-                                            height: 24,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      errorWidget: (_, __, ___) =>
-                                          _InitialsAvatar(
-                                            firstName: firstNameCtrl.text,
-                                            lastName: lastNameCtrl.text,
-                                          ),
-                                    )
-                                  : _InitialsAvatar(
-                                      firstName: firstNameCtrl.text,
-                                      lastName: lastNameCtrl.text,
-                                    ),
-                            ),
-                          ),
+    );
+  }
 
-                          /// 🔄 UPLOAD PROGRESS RING
-                          if (_uploadingPhoto)
-                            SizedBox(
-                              width: 96,
-                              height: 96,
-                              child: CircularProgressIndicator(
-                                value: _uploadProgress > 0
-                                    ? _uploadProgress
-                                    : null,
-                                strokeWidth: 4,
-                                backgroundColor: Colors.white,
-                                valueColor: AlwaysStoppedAnimation(
-                                  theme.colorScheme.primary,
-                                ),
+  Widget _buildProfileTab(ThemeData theme) {
+    return SafeArea(
+      child: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              /// 🖼 PROFILE PHOTO
+              GestureDetector(
+                onTap: _chooseImageSource,
+                child: Stack(
+                  children: [
+                    Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        ClipOval(
+                          child: SizedBox(
+                            width: 92,
+                            height: 92,
+                            child: _selectedImage != null
+                                ? Image.file(_selectedImage!, fit: BoxFit.cover)
+                                : (_photoUrl != null && _photoUrl!.isNotEmpty)
+                                ? CachedNetworkImage(
+                                    imageUrl: _photoUrl!,
+                                    fit: BoxFit.cover,
+                                    fadeInDuration: const Duration(
+                                      milliseconds: 250,
+                                    ),
+                                    placeholder: (context, url) => Stack(
+                                      alignment: Alignment.center,
+                                      children: [
+                                        _InitialsAvatar(
+                                          firstName: firstNameCtrl.text,
+                                          lastName: lastNameCtrl.text,
+                                        ),
+                                        const SizedBox(
+                                          width: 24,
+                                          height: 24,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    errorWidget: (_, __, ___) =>
+                                        _InitialsAvatar(
+                                          firstName: firstNameCtrl.text,
+                                          lastName: lastNameCtrl.text,
+                                        ),
+                                  )
+                                : _InitialsAvatar(
+                                    firstName: firstNameCtrl.text,
+                                    lastName: lastNameCtrl.text,
+                                  ),
+                          ),
+                        ),
+
+                        /// 🔄 UPLOAD PROGRESS RING
+                        if (_uploadingPhoto)
+                          SizedBox(
+                            width: 96,
+                            height: 96,
+                            child: CircularProgressIndicator(
+                              value: _uploadProgress > 0
+                                  ? _uploadProgress
+                                  : null,
+                              strokeWidth: 4,
+                              backgroundColor: Colors.white,
+                              valueColor: AlwaysStoppedAnimation(
+                                theme.colorScheme.primary,
                               ),
                             ),
-                        ],
-                      ),
-
-                      /// ✏️ EDIT ICON
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.primary,
-                            shape: BoxShape.circle,
                           ),
-                          child: const Icon(
-                            Icons.camera_alt,
-                            size: 16,
-                            color: Colors.white,
-                          ),
+                      ],
+                    ),
+
+                    /// ✏️ EDIT ICON
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary,
+                          shape: BoxShape.circle,
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 24),
-
-                /// 🧑 First Name
-                TextFormField(
-                  controller: firstNameCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'First Name',
-                    prefixIcon: Icon(Icons.person),
-                  ),
-                  validator: (v) => v == null || v.isEmpty ? 'Required' : null,
-                ),
-
-                const SizedBox(height: 16),
-
-                /// 🧑 Last Name
-                TextFormField(
-                  controller: lastNameCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Last Name',
-                    prefixIcon: Icon(Icons.person_outline),
-                  ),
-                  validator: (v) => v == null || v.isEmpty ? 'Required' : null,
-                ),
-
-                const SizedBox(height: 24),
-
-                /// 📱 Phone (Disabled)
-                TextFormField(
-                  controller: phoneCtrl,
-                  enabled: false,
-                  decoration: InputDecoration(
-                    labelText: 'Mobile Number',
-                    prefixIcon: const Icon(Icons.phone),
-                    suffixIcon: const Icon(Icons.verified, color: Colors.green),
-                    disabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey.shade300),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 16),
-
-                /// 📧 Email (Disabled)
-                TextFormField(
-                  controller: emailCtrl,
-                  enabled: true,
-                  decoration: InputDecoration(
-                    labelText: 'Email Address',
-                    prefixIcon: const Icon(Icons.email),
-                    suffixIcon: const Icon(
-                      Icons.lock_outline,
-                      color: Colors.grey,
-                    ),
-                    disabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey.shade300),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 12),
-
-                /// ℹ️ Info hint
-                Text(
-                  'Phone number and email cannot be changed.',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.hintColor,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-
-                const SizedBox(height: 28),
-
-                /// 📍 ADDRESS SECTION
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Address Details',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 12),
-
-                TextFormField(
-                  controller: address1Ctrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Address Line 1',
-                    prefixIcon: Icon(Icons.home_outlined),
-                  ),
-                ),
-
-                const SizedBox(height: 12),
-
-                TextFormField(
-                  controller: address2Ctrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Address Line 2 (Optional)',
-                    prefixIcon: Icon(Icons.location_on_outlined),
-                  ),
-                ),
-
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    icon: _locationLoading
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.my_location),
-                    label: const Text('Use Current Location'),
-                    onPressed: _locationLoading ? null : _fetchAddressFromGPS,
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 12),
-
-                TextFormField(
-                  controller: pincodeCtrl,
-                  keyboardType: TextInputType.number,
-                  maxLength: 6,
-                  decoration: InputDecoration(
-                    labelText: 'Pincode',
-                    prefixIcon: const Icon(Icons.markunread_mailbox_outlined),
-                    suffixIcon: _pincodeLoading
-                        ? const Padding(
-                            padding: EdgeInsets.all(12),
-                            child: SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                          )
-                        : null,
-                  ),
-                  onChanged: (val) {
-                    if (val.length == 6) {
-                      _fetchCityStateFromPincode(val);
-                      FocusScope.of(context).unfocus();
-                    }
-                  },
-                ),
-                const SizedBox(height: 12),
-
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: cityCtrl,
-                        enabled: true, // 🔒 auto-filled
-                        decoration: const InputDecoration(
-                          labelText: 'City',
-                          prefixIcon: Icon(Icons.location_city),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextFormField(
-                        controller: stateCtrl,
-                        enabled: true, // 🔒 auto-filled
-                        decoration: const InputDecoration(
-                          labelText: 'State',
-                          prefixIcon: Icon(Icons.map_outlined),
+                        child: const Icon(
+                          Icons.camera_alt,
+                          size: 16,
+                          color: Colors.white,
                         ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+              ),
+
+              const SizedBox(height: 24),
+
+              /// 🧑 First Name
+              TextFormField(
+                controller: firstNameCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'First Name',
+                  prefixIcon: Icon(Icons.person),
+                ),
+                validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+              ),
+
+              const SizedBox(height: 16),
+
+              /// 🧑 Last Name
+              TextFormField(
+                controller: lastNameCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Last Name',
+                  prefixIcon: Icon(Icons.person_outline),
+                ),
+                validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+              ),
+
+              const SizedBox(height: 24),
+
+              /// 📱 Phone (Disabled)
+              TextFormField(
+                controller: phoneCtrl,
+                enabled: false,
+                decoration: InputDecoration(
+                  labelText: 'Mobile Number',
+                  prefixIcon: const Icon(Icons.phone),
+                  suffixIcon: const Icon(Icons.verified, color: Colors.green),
+                  disabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              /// 📧 Email (Disabled)
+              TextFormField(
+                controller: emailCtrl,
+                enabled: true,
+                decoration: InputDecoration(
+                  labelText: 'Email Address',
+                  prefixIcon: const Icon(Icons.email),
+                  suffixIcon: const Icon(
+                    Icons.lock_outline,
+                    color: Colors.grey,
+                  ),
+                  disabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                ),
+              ),
+              if (!hasPasswordProvider) ...[
+                const SizedBox(height: 16),
 
                 TextFormField(
-                  controller: countryCtrl,
-                  enabled: true, // 🔒 auto-filled
+                  controller: passwordCtrl,
+                  obscureText: true,
                   decoration: const InputDecoration(
-                    labelText: 'Country',
-                    prefixIcon: Icon(Icons.public),
+                    labelText: 'Create Password',
+                    prefixIcon: Icon(Icons.lock),
                   ),
                 ),
 
-                //const Spacer(),
-                // const SizedBox(height: 32),
+                const SizedBox(height: 12),
 
-                // /// 💾 Save Button
-                // SizedBox(
-                //   width: double.infinity,
-                //   height: 52,
-                //   child: ElevatedButton(
-                //     onPressed: (loading || _uploadingPhoto) ? null : _save,
-                //     child: loading || _uploadingPhoto
-                //         ? const CircularProgressIndicator(color: Colors.white)
-                //         : const Text(
-                //             'Save Changes',
-                //             style: TextStyle(fontSize: 16),
-                //           ),
-                //   ),
-                // ),
-
-                // const SizedBox(height: 24),
+                TextFormField(
+                  controller: confirmPasswordCtrl,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Confirm Password',
+                    prefixIcon: Icon(Icons.lock_outline),
+                  ),
+                ),
               ],
-            ),
+
+              if (!emailVerified) ...[
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.email),
+                  label: const Text('Verify Email'),
+                  onPressed: () async {
+                    await _sendEmailVerification();
+                    //await sendEmailVerificationProper(emailCtrl.text.trim());
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Verification email sent')),
+                    );
+                  },
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('I have verified'),
+                  onPressed: () async {
+                    final user = FirebaseAuth.instance.currentUser!;
+                    await user.reload();
+                    setState(() => emailVerified = user.emailVerified);
+                    if (emailVerified) await _syncEmailVerificationHttp();
+                  },
+                ),
+              ] else ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: const [
+                    Icon(Icons.verified, color: Colors.green),
+                    SizedBox(width: 6),
+                    Text('Email Verified'),
+                  ],
+                ),
+              ],
+
+              const SizedBox(height: 12),
+
+              /// ℹ️ Info hint
+              Text(
+                'Phone number and email cannot be changed.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.hintColor,
+                ),
+                textAlign: TextAlign.center,
+              ),
+
+              const SizedBox(height: 28),
+
+              /// 📍 ADDRESS SECTION
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Address Details',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              TextFormField(
+                controller: address1Ctrl,
+                decoration: const InputDecoration(
+                  labelText: 'Address Line 1',
+                  prefixIcon: Icon(Icons.home_outlined),
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              TextFormField(
+                controller: address2Ctrl,
+                decoration: const InputDecoration(
+                  labelText: 'Address Line 2 (Optional)',
+                  prefixIcon: Icon(Icons.location_on_outlined),
+                ),
+              ),
+
+              /// 🪪 KYC SECTION
+              const SizedBox(height: 28),
+
+              // Align(
+              //   alignment: Alignment.centerLeft,
+              //   child: Text(
+              //     'Identity Verification (KYC)',
+              //     style: theme.textTheme.titleMedium?.copyWith(
+              //       fontWeight: FontWeight.bold,
+              //     ),
+              //   ),
+              // ),
+
+              // const SizedBox(height: 12),
+
+              // Card(
+              //   elevation: 2,
+              //   shape: RoundedRectangleBorder(
+              //     borderRadius: BorderRadius.circular(16),
+              //   ),
+              //   child: Padding(
+              //     padding: const EdgeInsets.all(16),
+              //     child: Column(
+              //       crossAxisAlignment: CrossAxisAlignment.start,
+              //       children: [
+              //         Row(
+              //           children: [
+              //             const Icon(Icons.badge_outlined),
+              //             const SizedBox(width: 8),
+              //             const Text(
+              //               'KYC Status',
+              //               style: TextStyle(fontWeight: FontWeight.w600),
+              //             ),
+              //             const Spacer(),
+              //             _kycStatusChip(kycStatus),
+              //           ],
+              //         ),
+
+              //         const SizedBox(height: 12),
+
+              //         Text(
+              //           _kycDescription(kycStatus),
+              //           style: theme.textTheme.bodySmall,
+              //         ),
+
+              //         const SizedBox(height: 14),
+
+              //         if (kycStatus == 'NOT_STARTED' || kycStatus == 'REJECTED')
+              //           SizedBox(
+              //             width: double.infinity,
+              //             child: ElevatedButton.icon(
+              //               icon: const Icon(Icons.upload_file),
+              //               label: Text(
+              //                 kycStatus == 'REJECTED'
+              //                     ? 'Re-submit KYC'
+              //                     : 'Start KYC',
+              //               ),
+              //               onPressed: () {
+              //                 // TODO: Implement KycStartScreen
+              //               },
+              //             ),
+              //           ),
+
+              //         if (kycStatus == 'SUBMITTED')
+              //           const Text(
+              //             'Your documents are under review (24–48 hrs).',
+              //             style: TextStyle(color: Colors.orange),
+              //           ),
+
+              //         if (kycStatus == 'APPROVED')
+              //           const Text(
+              //             'Your identity has been verified.',
+              //             style: TextStyle(color: Colors.green),
+              //           ),
+
+              //         if (kycStatus == 'REJECTED' &&
+              //             (kyc['rejectionReason'] ?? '').toString().isNotEmpty)
+              //           Padding(
+              //             padding: const EdgeInsets.only(top: 8),
+              //             child: Text(
+              //               'Reason: ${kyc['rejectionReason']}',
+              //               style: const TextStyle(color: Colors.red),
+              //             ),
+              //           ),
+              //       ],
+              //     ),
+              //   ),
+              // ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  icon: _locationLoading
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.my_location),
+                  label: const Text('Use Current Location'),
+                  onPressed: _locationLoading ? null : _fetchAddressFromGPS,
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              TextFormField(
+                controller: pincodeCtrl,
+                keyboardType: TextInputType.number,
+                maxLength: 6,
+                decoration: InputDecoration(
+                  labelText: 'Pincode',
+                  prefixIcon: const Icon(Icons.markunread_mailbox_outlined),
+                  suffixIcon: _pincodeLoading
+                      ? const Padding(
+                          padding: EdgeInsets.all(12),
+                          child: SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      : null,
+                ),
+                onChanged: (val) {
+                  if (val.length == 6) {
+                    _fetchCityStateFromPincode(val);
+                    FocusScope.of(context).unfocus();
+                  }
+                },
+              ),
+              const SizedBox(height: 12),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: cityCtrl,
+                      enabled: true, // 🔒 auto-filled
+                      decoration: const InputDecoration(
+                        labelText: 'City',
+                        prefixIcon: Icon(Icons.location_city),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextFormField(
+                      controller: stateCtrl,
+                      enabled: true, // 🔒 auto-filled
+                      decoration: const InputDecoration(
+                        labelText: 'State',
+                        prefixIcon: Icon(Icons.map_outlined),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              TextFormField(
+                controller: countryCtrl,
+                enabled: true, // 🔒 auto-filled
+                decoration: const InputDecoration(
+                  labelText: 'Country',
+                  prefixIcon: Icon(Icons.public),
+                ),
+              ),
+
+              //const Spacer(),
+              // const SizedBox(height: 32),
+
+              // /// 💾 Save Button
+              // SizedBox(
+              //   width: double.infinity,
+              //   height: 52,
+              //   child: ElevatedButton(
+              //     onPressed: (loading || _uploadingPhoto) ? null : _save,
+              //     child: loading || _uploadingPhoto
+              //         ? const CircularProgressIndicator(color: Colors.white)
+              //         : const Text(
+              //             'Save Changes',
+              //             style: TextStyle(fontSize: 16),
+              //           ),
+              //   ),
+              // ),
+
+              // const SizedBox(height: 24),
+            ],
           ),
         ),
       ),
     );
+  }
+
+  Widget _buildKycTab(
+    ThemeData theme,
+    Map<String, dynamic> kyc,
+    String status,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Card(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.badge_outlined),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'KYC Status',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  const Spacer(),
+                  _kycStatusChip(status),
+                ],
+              ),
+
+              const SizedBox(height: 12),
+              Text(_kycDescription(status)),
+
+              const SizedBox(height: 16),
+
+              if (status == 'NOT_STARTED' || status == 'REJECTED')
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.upload_file),
+                  label: Text(
+                    status == 'REJECTED' ? 'Re-submit KYC' : 'Start KYC',
+                  ),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const KycStartScreen()),
+                    );
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _kycDescription(String status) {
+    switch (status) {
+      case 'SUBMITTED':
+        return 'Your identity documents have been submitted.';
+      case 'APPROVED':
+        return 'Your identity is verified.';
+      case 'REJECTED':
+        return 'Your KYC was rejected. Please re-submit.';
+      default:
+        return 'Verify your identity to unlock full access.';
+    }
+  }
+
+  Widget _kycStatusChip(String status) {
+    switch (status) {
+      case 'APPROVED':
+        return const Chip(
+          label: Text('Verified'),
+          backgroundColor: Colors.green,
+        );
+      case 'SUBMITTED':
+        return const Chip(
+          label: Text('Under Review'),
+          backgroundColor: Colors.orange,
+        );
+      case 'REJECTED':
+        return const Chip(label: Text('Rejected'), backgroundColor: Colors.red);
+      default:
+        return const Chip(label: Text('Not Started'));
+    }
   }
 }
 
