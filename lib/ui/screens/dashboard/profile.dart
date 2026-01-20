@@ -1253,6 +1253,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
       case 'APPROVED':
         return const Chip(
           label: Text('Verified'),
+          labelStyle: TextStyle(color: Colors.white),
           backgroundColor: Colors.green,
         );
       case 'SUBMITTED':
