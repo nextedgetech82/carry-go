@@ -1,3 +1,4 @@
+import 'package:carrygo/core/startup/legal_acceptance_screen.dart';
 import 'package:carrygo/ui/screens/admin/admin_dashboard_screen.dart';
 import 'package:carrygo/ui/screens/admin/admin_home_screen.dart';
 import 'package:carrygo/ui/screens/buyer/dashboard/buyer_dashboard_screen.dart';
@@ -68,9 +69,8 @@ class SplashScreen extends ConsumerWidget {
         break;
 
       case StartupResult.senderDashboard:
-        page = const BuyerDashboardScreen();
+        page = BuyerDashboardScreen();
         break;
-
       case StartupResult.roleSelection:
         // role missing, redirect to signup or role selection flow
         //page = const SignupScreen();
@@ -81,6 +81,9 @@ class SplashScreen extends ConsumerWidget {
         break;
       case StartupResult.adminDashboard:
         page = const AdminDashboardScreen();
+        break;
+      case StartupResult.legal: // 🔐 ✅ FIX
+        page = const LegalAcceptanceScreen();
         break;
     }
 

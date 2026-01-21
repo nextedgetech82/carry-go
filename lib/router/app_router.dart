@@ -1,3 +1,4 @@
+import 'package:carrygo/core/startup/legal_acceptance_screen.dart';
 import 'package:flutter/material.dart';
 
 import '../ui/screens/onboarding/onboarding_screen.dart';
@@ -12,9 +13,16 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => const OnboardingScreen());
       case '/signup':
         return MaterialPageRoute(builder: (_) => const SignupScreen());
+      case '/legal': // 🔐 NEW
+        return _page(const LegalAcceptanceScreen());
       case '/':
       default:
         return MaterialPageRoute(builder: (_) => const SplashScreen());
     }
+  }
+
+  /// Common page wrapper (future-proof for transitions)
+  MaterialPageRoute _page(Widget child) {
+    return MaterialPageRoute(builder: (_) => child);
   }
 }

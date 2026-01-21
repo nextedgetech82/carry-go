@@ -55,6 +55,13 @@ final startupProvider = FutureProvider<StartupResult>((ref) async {
     return StartupResult.signin;
   }
 
+  // 🔐 LEGAL CHECK (NEW)
+  final data = doc.data()!;
+  final legalAccepted = data['legal']?['accepted'] == true;
+
+  if (!legalAccepted) {
+    return StartupResult.legal; // 🚨 FORCE LEGAL SCREEN
+  }
   final role = doc.data()?['role'];
 
   if (role == 'traveller') {

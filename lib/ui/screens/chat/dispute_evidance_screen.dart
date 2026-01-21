@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:carrygo/main.dart';
+import 'package:carrygo/ui/screens/chat/dispute_reason_section.dart';
 import 'package:carrygo/ui/screens/chat/full_image_screen.dart';
 import 'package:carrygo/ui/screens/chat/pdf_preview_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -9,6 +10,15 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+
+const disputeReasons = [
+  {'code': 'ITEM_DAMAGED', 'label': 'Item damaged during transit'},
+  {'code': 'ITEM_NOT_DELIVERED', 'label': 'Item not delivered'},
+  {'code': 'WRONG_ITEM', 'label': 'Wrong item received'},
+  {'code': 'DELAYED_DELIVERY', 'label': 'Delivery delayed'},
+  {'code': 'PAYMENT_DISPUTE', 'label': 'Payment related issue'},
+  {'code': 'OTHER', 'label': 'Other (please explain)'},
+];
 
 class DisputeEvidenceScreen extends StatelessWidget {
   final String tripRequestId;
@@ -64,6 +74,8 @@ class DisputeEvidenceScreen extends StatelessWidget {
               return Column(
                 children: [
                   _DisputeInfoBanner(status: status),
+                  DisputeReasonSection(disputeId: disputeId),
+                  const Divider(height: 1),
                   Expanded(child: _EvidenceList(disputeId: disputeId)),
                 ],
               );
@@ -252,6 +264,12 @@ class DisputeEvidenceScreen extends StatelessWidget {
             'url': url,
             'createdAt': FieldValue.serverTimestamp(),
           });
+
+      // 🔒 LOCK DISPUTE REASON
+      await FirebaseFirestore.instance
+          .collection('disputes')
+          .doc(disputeId)
+          .set({'reasonLocked': true}, SetOptions(merge: true));
     } finally {
       // ✅ Always close dialog (even if error occurs)
       if (navigatorKey.currentContext != null) {

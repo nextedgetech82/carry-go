@@ -1,6 +1,7 @@
 enum StartupResult {
   onboarding,
   signup,
+  legal,
   emailVerification,
   phoneVerification,
   travellerDashboard,
