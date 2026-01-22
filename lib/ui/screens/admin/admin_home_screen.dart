@@ -3,6 +3,7 @@ import 'package:carrygo/providers/my_trips_provider.dart';
 import 'package:carrygo/providers/user_profile_provider.dart';
 import 'package:carrygo/ui/screens/admin/admin_dashboard_screen.dart';
 import 'package:carrygo/ui/screens/dashboard/admin_kyc_list_screen.dart';
+import 'package:carrygo/ui/screens/feed/feed_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -90,6 +91,18 @@ class AdminHomeScreen extends ConsumerWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const AdminKycListScreen()),
+                );
+              },
+            ),
+            _AdminTile(
+              icon: Icons.dynamic_feed,
+              title: 'Community Feed',
+              subtitle: 'View posts & activity',
+              color: Colors.purple,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const FeedScreen()),
                 );
               },
             ),

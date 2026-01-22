@@ -11,6 +11,7 @@ import 'package:carrygo/ui/screens/dashboard/profile.dart';
 import 'package:carrygo/ui/screens/dashboard/traveller_drawer.dart';
 import 'package:carrygo/ui/screens/dashboard/wallet/wallet_provider.dart';
 import 'package:carrygo/ui/screens/dashboard/wallet/wallet_screen.dart';
+import 'package:carrygo/ui/screens/feed/feed_screen.dart';
 import 'package:carrygo/ui/screens/notifications/notification_history_screen.dart';
 import 'package:carrygo/ui/screens/sender/incoming_requests_provider.dart';
 import 'package:carrygo/ui/screens/trip/add_trip_screen.dart';
@@ -81,13 +82,14 @@ class TravellerDashboard extends ConsumerWidget {
           drawer: TravellerDrawer(profile: profile),
 
           body: DefaultTabController(
-            length: 2,
+            length: 3,
             child: Column(
               children: [
                 TabBar(
                   labelColor: theme.colorScheme.primary,
                   tabs: const [
                     Tab(icon: Icon(Icons.dashboard), text: 'Dashboard'),
+                    Tab(icon: Icon(Icons.dynamic_feed), text: 'Feed'),
                     Tab(icon: Icon(Icons.chat), text: 'Chats'),
                   ],
                 ),
@@ -100,6 +102,9 @@ class TravellerDashboard extends ConsumerWidget {
                         tripsAsync: tripsAsync,
                         profile: profile,
                       ),
+
+                      /// 🔥 SAME FeedScreen you already built
+                      const FeedScreen(),
                       AcceptedRequestsTab(theme: theme),
                     ],
                   ),
